@@ -17,10 +17,10 @@ constexpr int SKIP_PAGE_MS = 700;
 int EpubReaderChapterSelectionActivity::getPageItems() const {
   // Layout constants used in renderScreen
   constexpr int startY = 60;
-  constexpr int lineHeight = 30;
+  constexpr int lineHeight = 60;
 
   const int screenHeight = renderer.getScreenHeight();
-  const int endY = screenHeight - lineHeight;
+  const int endY = screenHeight;
 
   const int availableHeight = endY - startY;
   int items = availableHeight / lineHeight;
@@ -72,7 +72,7 @@ bool EpubReaderChapterSelectionActivity::onTouch(const TouchEvent& event) {
 
   // Rows: startY=60, lineHeight=30
   constexpr int startY = 60;
-  constexpr int lineHeight = 30;
+  constexpr int lineHeight = 60;
   if (!epub || y < startY) {
     return false;
   }
@@ -219,18 +219,16 @@ void EpubReaderChapterSelectionActivity::renderScreen() {
   renderer.drawCenteredText(UI_12_FONT_ID, 15, title.c_str(), true, EpdFontFamily::BOLD);
 
   const auto pageStartIndex = selectorIndex / pageItems * pageItems;
-  renderer.fillRect(0, 60 + (selectorIndex % pageItems) * 30 - 2, pageWidth - 1, 30);
+  renderer.fillRect(0, 60 + (selectorIndex % pageItems) * 60 - 2, pageWidth - 1, 60);
   for (int tocIndex = pageStartIndex; tocIndex < epub->getTocItemsCount() && tocIndex < pageStartIndex + pageItems;
        tocIndex++) {
     auto item = epub->getTocItem(tocIndex);
     const int indentX = 20 + (item.level - 1) * 15;
     const int maxTextWidth = (pageWidth - 1) - indentX;
     const std::string clipped = renderer.truncatedText(UI_10_FONT_ID, item.title.c_str(), maxTextWidth);
-    renderer.drawText(UI_10_FONT_ID, indentX, 60 + (tocIndex % pageItems) * 30, clipped.c_str(), tocIndex != selectorIndex);
+    renderer.drawText(UI_10_FONT_ID, indentX, 60 + (tocIndex % pageItems) * 60, clipped.c_str(),
+                      tocIndex != selectorIndex);
   }
-
-  const auto labels = mappedInput.mapLabels("« Back", "Select", "Up", "Down");
-  renderer.drawButtonHints(UI_10_FONT_ID, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
 
   renderer.displayBuffer();
 }

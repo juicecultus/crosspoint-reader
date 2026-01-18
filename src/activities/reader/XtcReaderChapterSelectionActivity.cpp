@@ -15,10 +15,10 @@ constexpr int SKIP_PAGE_MS = 700;
 
 int XtcReaderChapterSelectionActivity::getPageItems() const {
   constexpr int startY = 60;
-  constexpr int lineHeight = 30;
+  constexpr int lineHeight = 60;
 
   const int screenHeight = renderer.getScreenHeight();
-  const int endY = screenHeight - lineHeight;
+  const int endY = screenHeight;
 
   const int availableHeight = endY - startY;
   int items = availableHeight / lineHeight;
@@ -72,7 +72,7 @@ bool XtcReaderChapterSelectionActivity::onTouch(const TouchEvent& event) {
 
   // Rows: startY=60, lineHeight=30
   constexpr int startY = 60;
-  constexpr int lineHeight = 30;
+  constexpr int lineHeight = 60;
   if (y < startY) {
     return false;
   }
@@ -237,18 +237,15 @@ void XtcReaderChapterSelectionActivity::renderScreen() {
   }
 
   const auto pageStartIndex = selectorIndex / pageItems * pageItems;
-  renderer.fillRect(0, 60 + (selectorIndex % pageItems) * 30 - 2, pageWidth - 1, 30);
+  renderer.fillRect(0, 60 + (selectorIndex % pageItems) * 60 - 2, pageWidth - 1, 60);
   for (int i = pageStartIndex; i < static_cast<int>(chapters.size()) && i < pageStartIndex + pageItems; i++) {
     const auto& chapter = chapters[i];
     const char* title = chapter.name.empty() ? "Unnamed" : chapter.name.c_str();
     const int indentX = 20;
     const int maxTextWidth = (pageWidth - 1) - indentX;
     const std::string clipped = renderer.truncatedText(UI_10_FONT_ID, title, maxTextWidth);
-    renderer.drawText(UI_10_FONT_ID, indentX, 60 + (i % pageItems) * 30, clipped.c_str(), i != selectorIndex);
+    renderer.drawText(UI_10_FONT_ID, indentX, 60 + (i % pageItems) * 60, clipped.c_str(), i != selectorIndex);
   }
-
-  const auto labels = mappedInput.mapLabels("« Back", "Select", "Up", "Down");
-  renderer.drawButtonHints(UI_10_FONT_ID, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
 
   renderer.displayBuffer();
 }
