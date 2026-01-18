@@ -8,6 +8,61 @@
 #include "fontIds.h"
 #include "network/OtaUpdater.h"
 
+#ifdef USE_M5UNIFIED
+#include "touch/TouchEvent.h"
+#endif
+
+#ifdef USE_M5UNIFIED
+bool OtaUpdateActivity::onTouch(const TouchEvent& event) {
+  if (subActivity) {
+    return subActivity->onTouch(event);
+  }
+
+  if (event.type != TouchEvent::Type::Tap) {
+    return false;
+  }
+
+  const int w = renderer.getScreenWidth();
+  const int h = renderer.getScreenHeight();
+  const int x = event.end.x;
+  const int y = event.end.y;
+
+  // Bottom-left: Back/Cancel
+  if (y > h - 80 && x < w / 3) {
+    goBack();
+    return true;
+  }
+
+  // In confirmation view: bottom-right triggers update (same as Confirm)
+  if (state == WAITING_CONFIRMATION && y > h - 80 && x > (w * 2) / 3) {
+    Serial.printf("[%lu] [OTA] Touch: starting update...\n", millis());
+    xSemaphoreTake(renderingMutex, portMAX_DELAY);
+    state = UPDATE_IN_PROGRESS;
+    xSemaphoreGive(renderingMutex);
+    updateRequired = true;
+    vTaskDelay(10 / portTICK_PERIOD_MS);
+    const auto res = updater.installUpdate([this](const size_t, const size_t) { updateRequired = true; });
+
+    if (res != OtaUpdater::OK) {
+      Serial.printf("[%lu] [OTA] Update failed: %d\n", millis(), res);
+      xSemaphoreTake(renderingMutex, portMAX_DELAY);
+      state = FAILED;
+      xSemaphoreGive(renderingMutex);
+      updateRequired = true;
+      return true;
+    }
+
+    xSemaphoreTake(renderingMutex, portMAX_DELAY);
+    state = FINISHED;
+    xSemaphoreGive(renderingMutex);
+    updateRequired = true;
+    return true;
+  }
+
+  return false;
+}
+#endif
+
 void OtaUpdateActivity::taskTrampoline(void* param) {
   auto* self = static_cast<OtaUpdateActivity*>(param);
   self->displayTaskLoop();

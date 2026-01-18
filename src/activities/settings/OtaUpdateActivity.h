@@ -6,6 +6,10 @@
 #include "activities/ActivityWithSubactivity.h"
 #include "network/OtaUpdater.h"
 
+#ifdef USE_M5UNIFIED
+struct TouchEvent;
+#endif
+
 class OtaUpdateActivity : public ActivityWithSubactivity {
   enum State {
     WIFI_SELECTION,
@@ -42,4 +46,8 @@ class OtaUpdateActivity : public ActivityWithSubactivity {
   void onExit() override;
   void loop() override;
   bool preventAutoSleep() override { return state == CHECKING_FOR_UPDATE || state == UPDATE_IN_PROGRESS; }
+
+#ifdef USE_M5UNIFIED
+  bool onTouch(const TouchEvent& event) override;
+#endif
 };

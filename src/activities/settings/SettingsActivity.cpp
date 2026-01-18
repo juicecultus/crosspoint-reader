@@ -80,9 +80,8 @@ bool SettingsActivity::onTouch(const TouchEvent& event) {
   const int x = event.end.x;
   const int y = event.end.y;
 
-  // Bottom-left: Save & exit (matches button hint "« Save")
+  // Bottom-left: Back
   if (y > h - 80 && x < w / 3) {
-    SETTINGS.saveToFile();
     onGoHome();
     return true;
   }
@@ -172,7 +171,6 @@ void SettingsActivity::loop() {
   }
 
   if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
-    SETTINGS.saveToFile();
     onGoHome();
     return;
   }
@@ -293,7 +291,7 @@ void SettingsActivity::render() const {
                     pageHeight - 60, CROSSPOINT_VERSION);
 
   // Draw help text
-  const auto labels = mappedInput.mapLabels("« Save", "Toggle", "", "");
+  const auto labels = mappedInput.mapLabels("Back", "Select", "", "");
   renderer.drawButtonHints(UI_10_FONT_ID, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
 
   // Always use standard refresh for settings screen

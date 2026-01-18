@@ -33,9 +33,112 @@ void TxtReaderActivity::taskTrampoline(void* param) {
 }
 
 #ifdef USE_M5UNIFIED
+namespace {
+void drawTxtReaderChrome(GfxRenderer& renderer, const int selectionIndex) {
+  const int w = renderer.getScreenWidth();
+  const int h = renderer.getScreenHeight();
+
+  constexpr int fontId = UI_12_FONT_ID;
+  constexpr int rowH = 50;
+  constexpr int padY = 20;
+
+  const int boxW = w * 2 / 3;
+  const int boxH = padY * 2 + rowH * 2;
+  const int boxX = (w - boxW) / 2;
+  const int boxY = (h - boxH) / 2;
+
+  renderer.fillRect(boxX, boxY, boxW, boxH, false);
+  renderer.drawRect(boxX, boxY, boxW, boxH);
+
+  const char* items[2] = {"Files", "Home"};
+  for (int i = 0; i < 2; i++) {
+    const int rowTop = boxY + padY + i * rowH;
+    const int textW = renderer.getTextWidth(fontId, items[i]);
+    const int textH = renderer.getLineHeight(fontId);
+    const int textX = boxX + (boxW - textW) / 2;
+    const int textY = rowTop + (rowH - textH) / 2;
+    if (i == selectionIndex) {
+      renderer.fillRect(boxX + 10, rowTop, boxW - 20, rowH, true);
+      renderer.drawText(fontId, textX, textY, items[i], false);
+    } else {
+      renderer.drawText(fontId, textX, textY, items[i], true);
+    }
+  }
+}
+}  // namespace
+#endif
+
+#ifdef USE_M5UNIFIED
 bool TxtReaderActivity::onTouch(const TouchEvent& event) {
   if (subActivity) {
     return subActivity->onTouch(event);
+  }
+
+  const int w = renderer.getScreenWidth();
+  const int h = renderer.getScreenHeight();
+  const int x = event.end.x;
+  const int y = event.end.y;
+  const bool inCenter = (x >= w / 3 && x <= (w * 2) / 3 && y >= h / 3 && y <= (h * 2) / 3);
+
+  if (event.type == TouchEvent::Type::LongPress) {
+    if (!inCenter) {
+      return false;
+    }
+    chromeVisible = !chromeVisible;
+    chromeSelectionIndex = 0;
+    updateRequired = true;
+    return true;
+  }
+
+  if (chromeVisible) {
+    constexpr int rowH = 50;
+    constexpr int padY = 20;
+    const int boxW = w * 2 / 3;
+    const int boxH = padY * 2 + rowH * 2;
+    const int boxX = (w - boxW) / 2;
+    const int boxY = (h - boxH) / 2;
+
+    if (event.type == TouchEvent::Type::SwipeUp) {
+      chromeSelectionIndex = (chromeSelectionIndex + 2 - 1) % 2;
+      updateRequired = true;
+      return true;
+    }
+
+    if (event.type == TouchEvent::Type::SwipeDown) {
+      chromeSelectionIndex = (chromeSelectionIndex + 1) % 2;
+      updateRequired = true;
+      return true;
+    }
+
+    if (event.type == TouchEvent::Type::Tap) {
+      const int tx = event.end.x;
+      const int ty = event.end.y;
+      const bool inside = (tx >= boxX && tx < boxX + boxW && ty >= boxY && ty < boxY + boxH);
+      if (!inside) {
+        chromeVisible = false;
+        updateRequired = true;
+        return true;
+      }
+
+      const int relY = ty - (boxY + padY);
+      if (relY >= 0) {
+        const int rowIndex = relY / rowH;
+        if (rowIndex >= 0 && rowIndex < 2) {
+          chromeSelectionIndex = rowIndex;
+        }
+      }
+
+      if (chromeSelectionIndex == 0) {
+        pendingGoBackToFiles = true;
+      } else {
+        pendingGoHomeFromChrome = true;
+      }
+      chromeVisible = false;
+      updateRequired = true;
+      return true;
+    }
+
+    return true;
   }
 
   if (event.type == TouchEvent::Type::SwipeUp) {
@@ -43,14 +146,31 @@ bool TxtReaderActivity::onTouch(const TouchEvent& event) {
     return true;
   }
 
+  if (event.type == TouchEvent::Type::SwipeLeft) {
+    if (currentPage < totalPages - 1) {
+      currentPage++;
+      updateRequired = true;
+    }
+    return true;
+  }
+
+  if (event.type == TouchEvent::Type::SwipeRight) {
+    if (currentPage > 0) {
+      currentPage--;
+      updateRequired = true;
+    }
+    return true;
+  }
+
   if (event.type != TouchEvent::Type::Tap) {
     return false;
   }
 
-  const int w = renderer.getScreenWidth();
-  const int x = event.end.x;
+  if (inCenter) {
+    pendingGoBackToFiles = true;
+    return true;
+  }
 
-  // Option A: left=prev, right=next, center=menu.
   if (x < w / 3) {
     if (currentPage > 0) {
       currentPage--;
@@ -67,7 +187,6 @@ bool TxtReaderActivity::onTouch(const TouchEvent& event) {
     return true;
   }
 
-  // Center tap: reserved for menu/chrome. For now consume it.
   return true;
 }
 #endif
@@ -97,6 +216,7 @@ void TxtReaderActivity::onEnter() {
 #endif
 
   renderingMutex = xSemaphoreCreateMutex();
+  stopRequested = false;
 
   txt->setupCacheDir();
 
@@ -121,17 +241,23 @@ void TxtReaderActivity::onExit() {
   // Reset orientation back to portrait for the rest of the UI
   renderer.setOrientation(GfxRenderer::Orientation::Portrait);
 
+  stopRequested = true;
+
+  const uint32_t start = millis();
+  while (displayTaskHandle && millis() - start < 2500) {
+    vTaskDelay(pdMS_TO_TICKS(10));
+  }
+
   if (renderingMutex) {
     const bool locked = xSemaphoreTake(renderingMutex, pdMS_TO_TICKS(2000)) == pdTRUE;
-    if (displayTaskHandle) {
-      vTaskDelete(displayTaskHandle);
-      displayTaskHandle = nullptr;
-    }
     if (locked) {
+      xSemaphoreGive(renderingMutex);
       vSemaphoreDelete(renderingMutex);
+      renderingMutex = nullptr;
     }
-    renderingMutex = nullptr;
-  } else if (displayTaskHandle) {
+  }
+
+  if (displayTaskHandle) {
     vTaskDelete(displayTaskHandle);
     displayTaskHandle = nullptr;
   }
@@ -152,6 +278,20 @@ void TxtReaderActivity::loop() {
     subActivity->loop();
     return;
   }
+
+#ifdef USE_M5UNIFIED
+  if (pendingGoHomeFromChrome) {
+    pendingGoHomeFromChrome = false;
+    onGoHome();
+    return;
+  }
+
+  if (pendingGoBackToFiles) {
+    pendingGoBackToFiles = false;
+    onGoBack();
+    return;
+  }
+#endif
 
   // Long press BACK (1s+) goes directly to home
   if (mappedInput.isPressed(MappedInputManager::Button::Back) && mappedInput.getHeldTime() >= goHomeMs) {
@@ -187,6 +327,10 @@ void TxtReaderActivity::loop() {
 
 void TxtReaderActivity::displayTaskLoop() {
   while (true) {
+    if (stopRequested) {
+      displayTaskHandle = nullptr;
+      vTaskDelete(nullptr);
+    }
     if (updateRequired) {
       updateRequired = false;
       xSemaphoreTake(renderingMutex, portMAX_DELAY);
@@ -529,6 +673,13 @@ void TxtReaderActivity::renderPage() {
     renderer.displayBuffer();
     pagesUntilFullRefresh--;
   }
+
+#ifdef USE_M5UNIFIED
+  if (chromeVisible) {
+    drawTxtReaderChrome(renderer, chromeSelectionIndex);
+    renderer.displayBuffer(EInkDisplay::FAST_REFRESH);
+  }
+#endif
 
   // Grayscale rendering pass (for anti-aliased fonts)
   if (SETTINGS.textAntiAliasing) {

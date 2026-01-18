@@ -12,10 +12,64 @@
 #include "activities/util/KeyboardEntryActivity.h"
 #include "fontIds.h"
 
+#ifdef USE_M5UNIFIED
+#include "touch/TouchEvent.h"
+#endif
+
 namespace {
 constexpr int MENU_ITEMS = 2;
 const char* menuNames[MENU_ITEMS] = {"Calibre Web URL", "Connect as Wireless Device"};
 }  // namespace
+
+#ifdef USE_M5UNIFIED
+bool CalibreSettingsActivity::onTouch(const TouchEvent& event) {
+  if (subActivity) {
+    return subActivity->onTouch(event);
+  }
+
+  if (event.type == TouchEvent::Type::SwipeUp) {
+    selectedIndex = (selectedIndex + MENU_ITEMS - 1) % MENU_ITEMS;
+    updateRequired = true;
+    return true;
+  }
+
+  if (event.type == TouchEvent::Type::SwipeDown) {
+    selectedIndex = (selectedIndex + 1) % MENU_ITEMS;
+    updateRequired = true;
+    return true;
+  }
+
+  if (event.type != TouchEvent::Type::Tap) {
+    return false;
+  }
+
+  const int w = renderer.getScreenWidth();
+  const int h = renderer.getScreenHeight();
+  const int x = event.end.x;
+  const int y = event.end.y;
+
+  // Bottom-left: Back
+  if (y > h - 80 && x < w / 3) {
+    onBack();
+    return true;
+  }
+
+  // Menu rows: start at y=120, lineHeight=40 (must match render())
+  constexpr int startY = 120;
+  constexpr int lineHeight = 40;
+  if (y >= startY) {
+    const int idx = (y - startY) / lineHeight;
+    if (idx >= 0 && idx < MENU_ITEMS) {
+      selectedIndex = idx;
+      handleSelection();
+      updateRequired = true;
+      return true;
+    }
+  }
+
+  return false;
+}
+#endif
 
 void CalibreSettingsActivity::taskTrampoline(void* param) {
   auto* self = static_cast<CalibreSettingsActivity*>(param);

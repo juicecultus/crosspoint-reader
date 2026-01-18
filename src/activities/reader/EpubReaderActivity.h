@@ -16,11 +16,20 @@ class EpubReaderActivity final : public ActivityWithSubactivity {
   std::unique_ptr<Section> section = nullptr;
   TaskHandle_t displayTaskHandle = nullptr;
   SemaphoreHandle_t renderingMutex = nullptr;
+  bool stopRequested = false;
   int currentSpineIndex = 0;
   int nextPageNumber = 0;
   int pagesUntilFullRefresh = 0;
   bool updateRequired = false;
   bool pendingOpenChapterSelection = false;
+
+#ifdef USE_M5UNIFIED
+  bool chromeVisible = false;
+  int chromeSelectionIndex = 0;
+  bool pendingGoBackToFiles = false;
+  bool pendingGoHomeFromChrome = false;
+#endif
+
   const std::function<void()> onGoBack;
   const std::function<void()> onGoHome;
 

@@ -22,9 +22,19 @@ class XtcReaderActivity final : public ActivityWithSubactivity {
   std::shared_ptr<Xtc> xtc;
   TaskHandle_t displayTaskHandle = nullptr;
   SemaphoreHandle_t renderingMutex = nullptr;
+  bool stopRequested = false;
   uint32_t currentPage = 0;
   int pagesUntilFullRefresh = 0;
   bool updateRequired = false;
+
+#ifdef USE_M5UNIFIED
+  bool chromeVisible = false;
+  int chromeSelectionIndex = 0;
+  bool pendingOpenChapterSelection = false;
+  bool pendingGoBackToFiles = false;
+  bool pendingGoHomeFromChrome = false;
+#endif
+
   const std::function<void()> onGoBack;
   const std::function<void()> onGoHome;
 

@@ -18,10 +18,19 @@ class TxtReaderActivity final : public ActivityWithSubactivity {
   std::unique_ptr<Txt> txt;
   TaskHandle_t displayTaskHandle = nullptr;
   SemaphoreHandle_t renderingMutex = nullptr;
+  bool stopRequested = false;
   int currentPage = 0;
   int totalPages = 1;
   int pagesUntilFullRefresh = 0;
   bool updateRequired = false;
+
+#ifdef USE_M5UNIFIED
+  bool chromeVisible = false;
+  int chromeSelectionIndex = 0;
+  bool pendingGoBackToFiles = false;
+  bool pendingGoHomeFromChrome = false;
+#endif
+
   const std::function<void()> onGoBack;
   const std::function<void()> onGoHome;
 
