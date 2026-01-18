@@ -104,6 +104,60 @@ void SleepActivity::renderCustomSleepScreen() const {
   }
   if (dir) dir.close();
 
+  dir = SdMan.open("/images");
+  if (dir && dir.isDirectory()) {
+    std::vector<std::string> files;
+    char name[500];
+    for (auto file = dir.openNextFile(); file; file = dir.openNextFile()) {
+      if (file.isDirectory()) {
+        file.close();
+        continue;
+      }
+      file.getName(name, sizeof(name));
+      auto filename = std::string(name);
+      if (filename[0] == '.') {
+        file.close();
+        continue;
+      }
+
+      if (filename.substr(filename.length() - 4) != ".bmp") {
+        Serial.printf("[%lu] [SLP] Skipping non-.bmp file name: %s\n", millis(), name);
+        file.close();
+        continue;
+      }
+      Bitmap bitmap(file);
+      if (bitmap.parseHeaders() != BmpReaderError::Ok) {
+        Serial.printf("[%lu] [SLP] Skipping invalid BMP file: %s\n", millis(), name);
+        file.close();
+        continue;
+      }
+      files.emplace_back(filename);
+      file.close();
+    }
+    const auto numFiles = files.size();
+    if (numFiles > 0) {
+      auto randomFileIndex = random(numFiles);
+      while (numFiles > 1 && randomFileIndex == APP_STATE.lastSleepImage) {
+        randomFileIndex = random(numFiles);
+      }
+      APP_STATE.lastSleepImage = randomFileIndex;
+      APP_STATE.saveToFile();
+      const auto filename = "/images/" + files[randomFileIndex];
+      FsFile file;
+      if (SdMan.openFileForRead("SLP", filename, file)) {
+        Serial.printf("[%lu] [SLP] Randomly loading: /images/%s\n", millis(), files[randomFileIndex].c_str());
+        delay(100);
+        Bitmap bitmap(file, true);
+        if (bitmap.parseHeaders() == BmpReaderError::Ok) {
+          renderBitmapSleepScreen(bitmap);
+          dir.close();
+          return;
+        }
+      }
+    }
+  }
+  if (dir) dir.close();
+
   // Look for sleep.bmp on the root of the sd card to determine if we should
   // render a custom sleep screen instead of the default.
   FsFile file;
