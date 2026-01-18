@@ -40,7 +40,8 @@ bool EpubReaderChapterSelectionActivity::onTouch(const TouchEvent& event) {
     if (total <= 0) {
       return true;
     }
-    selectorIndex = (selectorIndex + total - 1) % total;
+    const int pageItems = getPageItems();
+    selectorIndex = (selectorIndex + total - pageItems) % total;
     updateRequired = true;
     return true;
   }
@@ -50,7 +51,8 @@ bool EpubReaderChapterSelectionActivity::onTouch(const TouchEvent& event) {
     if (total <= 0) {
       return true;
     }
-    selectorIndex = (selectorIndex + 1) % total;
+    const int pageItems = getPageItems();
+    selectorIndex = (selectorIndex + pageItems) % total;
     updateRequired = true;
     return true;
   }
