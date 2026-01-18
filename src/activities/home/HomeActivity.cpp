@@ -6,6 +6,7 @@
 #include <SDCardManager.h>
 #include <Xtc.h>
 
+#include <cstdio>
 #include <cstring>
 #include <vector>
 
@@ -18,6 +19,7 @@
 #include "util/StringUtils.h"
 
 #ifdef USE_M5UNIFIED
+#include <M5Unified.h>
 #include "touch/TouchEvent.h"
 #endif
 
@@ -120,6 +122,8 @@ void HomeActivity::onEnter() {
   Activity::onEnter();
 
   renderingMutex = xSemaphoreCreateMutex();
+
+  lastRenderedMinute = -1;
 
   // Check if we have a book to continue reading
   hasContinueReading = !APP_STATE.openEpubPath.empty() && SdMan.exists(APP_STATE.openEpubPath.c_str());
@@ -329,6 +333,16 @@ void HomeActivity::requestRedraw() {
 
 void HomeActivity::displayTaskLoop() {
   while (true) {
+#ifdef USE_M5UNIFIED
+    if (M5.Rtc.isEnabled()) {
+      const auto rtcTime = M5.Rtc.getTime();
+      if (rtcTime.minutes != lastRenderedMinute) {
+        lastRenderedMinute = rtcTime.minutes;
+        updateRequired = true;
+      }
+    }
+#endif
+
     if (updateRequired) {
       updateRequired = false;
       xSemaphoreTake(renderingMutex, portMAX_DELAY);
@@ -348,6 +362,17 @@ void HomeActivity::render() {
 
   const auto pageWidth = renderer.getScreenWidth();
   const auto pageHeight = renderer.getScreenHeight();
+
+#ifdef USE_M5UNIFIED
+  {
+    char timeText[6] = "--:--";
+    if (M5.Rtc.isEnabled()) {
+      const auto rtcTime = M5.Rtc.getTime();
+      std::snprintf(timeText, sizeof(timeText), "%02d:%02d", rtcTime.hours, rtcTime.minutes);
+    }
+    renderer.drawText(SMALL_FONT_ID, 20, 10, timeText);
+  }
+#endif
 
   constexpr int margin = 20;
   constexpr int bottomMargin = 60;

@@ -17,6 +17,7 @@ class HomeActivity final : public Activity {
   int selectorIndex = 0;
   bool updateRequired = false;
   bool pendingActivate = false;
+  int lastRenderedMinute = -1;
   bool hasContinueReading = false;
   bool hasOpdsUrl = false;
   bool hasCoverImage = false;
