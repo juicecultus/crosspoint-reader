@@ -216,7 +216,9 @@ bool OpdsBookBrowserActivity::onTouch(const TouchEvent& event) {
     if (entries.empty()) {
       return true;
     }
-    selectorIndex = (selectorIndex + static_cast<int>(entries.size()) - 1) % static_cast<int>(entries.size());
+    const int total = static_cast<int>(entries.size());
+    const int step = std::min(PAGE_ITEMS, total);
+    selectorIndex = (selectorIndex + total - step) % total;
     updateRequired = true;
     return true;
   }
@@ -225,7 +227,9 @@ bool OpdsBookBrowserActivity::onTouch(const TouchEvent& event) {
     if (entries.empty()) {
       return true;
     }
-    selectorIndex = (selectorIndex + 1) % static_cast<int>(entries.size());
+    const int total = static_cast<int>(entries.size());
+    const int step = std::min(PAGE_ITEMS, total);
+    selectorIndex = (selectorIndex + step) % total;
     updateRequired = true;
     return true;
   }

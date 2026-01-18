@@ -33,7 +33,8 @@ bool FileSelectionActivity::onTouch(const TouchEvent& event) {
     if (files.empty()) {
       return true;
     }
-    selectorIndex = (selectorIndex + files.size() - 1) % files.size();
+    const size_t step = std::min(static_cast<size_t>(PAGE_ITEMS), files.size());
+    selectorIndex = (selectorIndex + files.size() - step) % files.size();
     updateRequired = true;
     return true;
   }
@@ -42,7 +43,8 @@ bool FileSelectionActivity::onTouch(const TouchEvent& event) {
     if (files.empty()) {
       return true;
     }
-    selectorIndex = (selectorIndex + 1) % files.size();
+    const size_t step = std::min(static_cast<size_t>(PAGE_ITEMS), files.size());
+    selectorIndex = (selectorIndex + step) % files.size();
     updateRequired = true;
     return true;
   }

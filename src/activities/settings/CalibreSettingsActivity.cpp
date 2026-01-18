@@ -28,13 +28,15 @@ bool CalibreSettingsActivity::onTouch(const TouchEvent& event) {
   }
 
   if (event.type == TouchEvent::Type::SwipeUp) {
-    selectedIndex = (selectedIndex + MENU_ITEMS - 1) % MENU_ITEMS;
+    const int step = MENU_ITEMS;
+    selectedIndex = (selectedIndex + MENU_ITEMS - step) % MENU_ITEMS;
     updateRequired = true;
     return true;
   }
 
   if (event.type == TouchEvent::Type::SwipeDown) {
-    selectedIndex = (selectedIndex + 1) % MENU_ITEMS;
+    const int step = MENU_ITEMS;
+    selectedIndex = (selectedIndex + step) % MENU_ITEMS;
     updateRequired = true;
     return true;
   }

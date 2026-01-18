@@ -3,6 +3,7 @@
 #include <GfxRenderer.h>
 #include <WiFi.h>
 
+#include <algorithm>
 #include <map>
 
 #include "MappedInputManager.h"
@@ -47,15 +48,29 @@ bool WifiSelectionActivity::onTouch(const TouchEvent& event) {
 
   if (state == WifiSelectionState::NETWORK_LIST) {
     if (event.type == TouchEvent::Type::SwipeUp) {
-      if (selectedNetworkIndex > 0) {
-        selectedNetworkIndex--;
+      constexpr int startY = 60;
+      constexpr int lineHeight = 25;
+      const int pageHeight = renderer.getScreenHeight();
+      const int maxVisibleNetworks = (pageHeight - startY - 40) / lineHeight;
+
+      if (!networks.empty()) {
+        const int total = static_cast<int>(networks.size());
+        const int step = std::min(std::max(maxVisibleNetworks, 1), total);
+        selectedNetworkIndex = std::max(0, selectedNetworkIndex - step);
         updateRequired = true;
       }
       return true;
     }
     if (event.type == TouchEvent::Type::SwipeDown) {
-      if (!networks.empty() && selectedNetworkIndex < static_cast<int>(networks.size()) - 1) {
-        selectedNetworkIndex++;
+      constexpr int startY = 60;
+      constexpr int lineHeight = 25;
+      const int pageHeight = renderer.getScreenHeight();
+      const int maxVisibleNetworks = (pageHeight - startY - 40) / lineHeight;
+
+      if (!networks.empty()) {
+        const int total = static_cast<int>(networks.size());
+        const int step = std::min(std::max(maxVisibleNetworks, 1), total);
+        selectedNetworkIndex = std::min(total - 1, selectedNetworkIndex + step);
         updateRequired = true;
       }
       return true;

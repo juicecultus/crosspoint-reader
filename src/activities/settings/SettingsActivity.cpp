@@ -84,13 +84,15 @@ bool SettingsActivity::onTouch(const TouchEvent& event) {
   }
 
   if (event.type == TouchEvent::Type::SwipeUp) {
-    selectedSettingIndex = (selectedSettingIndex > 0) ? (selectedSettingIndex - 1) : (settingsCount - 1);
+    const int pageItems = getSettingsPageItems(renderer);
+    selectedSettingIndex = (selectedSettingIndex + settingsCount - pageItems) % settingsCount;
     updateRequired = true;
     return true;
   }
 
   if (event.type == TouchEvent::Type::SwipeDown) {
-    selectedSettingIndex = (selectedSettingIndex < settingsCount - 1) ? (selectedSettingIndex + 1) : 0;
+    const int pageItems = getSettingsPageItems(renderer);
+    selectedSettingIndex = (selectedSettingIndex + pageItems) % settingsCount;
     updateRequired = true;
     return true;
   }

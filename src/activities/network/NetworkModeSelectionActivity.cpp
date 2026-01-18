@@ -24,13 +24,15 @@ void NetworkModeSelectionActivity::taskTrampoline(void* param) {
 #ifdef USE_M5UNIFIED
 bool NetworkModeSelectionActivity::onTouch(const TouchEvent& event) {
   if (event.type == TouchEvent::Type::SwipeUp) {
-    selectedIndex = (selectedIndex + MENU_ITEM_COUNT - 1) % MENU_ITEM_COUNT;
+    const int step = MENU_ITEM_COUNT;
+    selectedIndex = (selectedIndex + MENU_ITEM_COUNT - step) % MENU_ITEM_COUNT;
     updateRequired = true;
     return true;
   }
 
   if (event.type == TouchEvent::Type::SwipeDown) {
-    selectedIndex = (selectedIndex + 1) % MENU_ITEM_COUNT;
+    const int step = MENU_ITEM_COUNT;
+    selectedIndex = (selectedIndex + step) % MENU_ITEM_COUNT;
     updateRequired = true;
     return true;
   }
