@@ -17,7 +17,12 @@
 
 // Define the static settings list
 namespace {
+#ifdef USE_M5UNIFIED
+constexpr int settingsCount = 16;
+#else
 constexpr int settingsCount = 20;
+#endif
+
 const SettingInfo settingsList[settingsCount] = {
     // Should match with SLEEP_SCREEN_MODE
     SettingInfo::Enum("Sleep Screen", &CrossPointSettings::sleepScreen, {"Dark", "Light", "Custom", "Cover", "None"}),
@@ -26,13 +31,17 @@ const SettingInfo settingsList[settingsCount] = {
     SettingInfo::Enum("Hide Battery %", &CrossPointSettings::hideBatteryPercentage, {"Never", "In Reader", "Always"}),
     SettingInfo::Toggle("Extra Paragraph Spacing", &CrossPointSettings::extraParagraphSpacing),
     SettingInfo::Toggle("Text Anti-Aliasing", &CrossPointSettings::textAntiAliasing),
+#ifndef USE_M5UNIFIED
     SettingInfo::Enum("Short Power Button Click", &CrossPointSettings::shortPwrBtn, {"Ignore", "Sleep", "Page Turn"}),
+#endif
     SettingInfo::Enum("Reading Orientation", &CrossPointSettings::orientation, {"Portrait", "Landscape", "Auto"}),
+#ifndef USE_M5UNIFIED
     SettingInfo::Enum("Front Button Layout", &CrossPointSettings::frontButtonLayout,
                       {"Bck, Cnfrm, Lft, Rght", "Lft, Rght, Bck, Cnfrm", "Lft, Bck, Cnfrm, Rght"}),
     SettingInfo::Enum("Side Button Layout (reader)", &CrossPointSettings::sideButtonLayout,
                       {"Prev, Next", "Next, Prev"}),
     SettingInfo::Toggle("Long-press Chapter Skip", &CrossPointSettings::longPressChapterSkip),
+#endif
     SettingInfo::Enum("Reader Font Family", &CrossPointSettings::fontFamily,
                       {"Bookerly", "Noto Sans", "Open Dyslexic"}),
     SettingInfo::Enum("Reader Font Size", &CrossPointSettings::fontSize, {"Small", "Medium", "Large", "X Large"}),
