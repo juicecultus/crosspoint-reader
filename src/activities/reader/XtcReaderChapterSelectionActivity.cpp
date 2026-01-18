@@ -238,13 +238,15 @@ void XtcReaderChapterSelectionActivity::renderScreen() {
 
   const auto pageStartIndex = selectorIndex / pageItems * pageItems;
   renderer.fillRect(0, 60 + (selectorIndex % pageItems) * 60 - 2, pageWidth - 1, 60);
+  const int textYOffset = (60 - renderer.getLineHeight(UI_10_FONT_ID)) / 2;
   for (int i = pageStartIndex; i < static_cast<int>(chapters.size()) && i < pageStartIndex + pageItems; i++) {
     const auto& chapter = chapters[i];
     const char* title = chapter.name.empty() ? "Unnamed" : chapter.name.c_str();
     const int indentX = 20;
     const int maxTextWidth = (pageWidth - 1) - indentX;
     const std::string clipped = renderer.truncatedText(UI_10_FONT_ID, title, maxTextWidth);
-    renderer.drawText(UI_10_FONT_ID, indentX, 60 + (i % pageItems) * 60, clipped.c_str(), i != selectorIndex);
+    renderer.drawText(UI_10_FONT_ID, indentX, 60 + (i % pageItems) * 60 + textYOffset, clipped.c_str(),
+                      i != selectorIndex);
   }
 
   renderer.displayBuffer();
