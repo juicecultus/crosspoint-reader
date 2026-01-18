@@ -94,6 +94,13 @@ void WifiSelectionActivity::onExit() {
   Serial.printf("[%lu] [WIFI] [MEM] Free heap at onExit end: %d bytes\n", millis(), ESP.getFreeHeap());
 }
 
+void WifiSelectionActivity::requestRedraw() {
+  if (subActivity) {
+    subActivity->requestRedraw();
+  }
+  updateRequired = true;
+}
+
 void WifiSelectionActivity::startWifiScan() {
   state = WifiSelectionState::SCANNING;
   networks.clear();

@@ -11,6 +11,12 @@
 #include <GfxRenderer.h>
 #include <SDCardManager.h>
 
+#ifdef USE_M5UNIFIED
+#include <M5Unified.h>
+
+#include "touch/TouchEvent.h"
+#endif
+
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
 #include "MappedInputManager.h"
@@ -26,6 +32,62 @@ void XtcReaderActivity::taskTrampoline(void* param) {
   auto* self = static_cast<XtcReaderActivity*>(param);
   self->displayTaskLoop();
 }
+
+#ifdef USE_M5UNIFIED
+bool XtcReaderActivity::onTouch(const TouchEvent& event) {
+  if (subActivity) {
+    return subActivity->onTouch(event);
+  }
+
+  if (event.type == TouchEvent::Type::SwipeUp) {
+    onGoHome();
+    return true;
+  }
+
+  if (event.type != TouchEvent::Type::Tap) {
+    return false;
+  }
+
+  const int w = renderer.getScreenWidth();
+  const int x = event.end.x;
+
+  if (x < w / 3) {
+    if (currentPage > 0) {
+      currentPage--;
+      updateRequired = true;
+    }
+    return true;
+  }
+
+  if (x > (w * 2) / 3) {
+    currentPage++;
+    if (xtc && currentPage > xtc->getPageCount()) {
+      currentPage = xtc->getPageCount();
+    }
+    updateRequired = true;
+    return true;
+  }
+
+  // Center tap: open chapter selection if available.
+  if (xtc && xtc->hasChapters() && !xtc->getChapters().empty() && renderingMutex) {
+    xSemaphoreTake(renderingMutex, portMAX_DELAY);
+    exitActivity();
+    enterNewActivity(new XtcReaderChapterSelectionActivity(
+        this->renderer, this->mappedInput, xtc, currentPage,
+        [this] {
+          exitActivity();
+          updateRequired = true;
+        },
+        [this](const uint32_t newPage) {
+          currentPage = newPage;
+          exitActivity();
+          updateRequired = true;
+        }));
+    xSemaphoreGive(renderingMutex);
+  }
+  return true;
+}
+#endif
 
 void XtcReaderActivity::onEnter() {
   ActivityWithSubactivity::onEnter();
@@ -59,15 +121,28 @@ void XtcReaderActivity::onEnter() {
 void XtcReaderActivity::onExit() {
   ActivityWithSubactivity::onExit();
 
-  // Wait until not rendering to delete task
-  xSemaphoreTake(renderingMutex, portMAX_DELAY);
-  if (displayTaskHandle) {
+  if (renderingMutex) {
+    const bool locked = xSemaphoreTake(renderingMutex, pdMS_TO_TICKS(2000)) == pdTRUE;
+    if (displayTaskHandle) {
+      vTaskDelete(displayTaskHandle);
+      displayTaskHandle = nullptr;
+    }
+    if (locked) {
+      vSemaphoreDelete(renderingMutex);
+    }
+    renderingMutex = nullptr;
+  } else if (displayTaskHandle) {
     vTaskDelete(displayTaskHandle);
     displayTaskHandle = nullptr;
   }
-  vSemaphoreDelete(renderingMutex);
-  renderingMutex = nullptr;
   xtc.reset();
+}
+
+void XtcReaderActivity::requestRedraw() {
+  if (subActivity) {
+    subActivity->requestRedraw();
+  }
+  updateRequired = true;
 }
 
 void XtcReaderActivity::loop() {

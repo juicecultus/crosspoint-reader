@@ -102,14 +102,20 @@ void HomeActivity::onEnter() {
 void HomeActivity::onExit() {
   Activity::onExit();
 
-  // Wait until not rendering to delete task to avoid killing mid-instruction to EPD
-  xSemaphoreTake(renderingMutex, portMAX_DELAY);
-  if (displayTaskHandle) {
+  if (renderingMutex) {
+    const bool locked = xSemaphoreTake(renderingMutex, pdMS_TO_TICKS(2000)) == pdTRUE;
+    if (displayTaskHandle) {
+      vTaskDelete(displayTaskHandle);
+      displayTaskHandle = nullptr;
+    }
+    if (locked) {
+      vSemaphoreDelete(renderingMutex);
+    }
+    renderingMutex = nullptr;
+  } else if (displayTaskHandle) {
     vTaskDelete(displayTaskHandle);
     displayTaskHandle = nullptr;
   }
-  vSemaphoreDelete(renderingMutex);
-  renderingMutex = nullptr;
 
   // Free the stored cover buffer if any
   freeCoverBuffer();
@@ -192,6 +198,14 @@ void HomeActivity::loop() {
     selectorIndex = (selectorIndex + 1) % menuCount;
     updateRequired = true;
   }
+}
+
+void HomeActivity::requestRedraw() {
+  // Home caches a rendered cover buffer in the current orientation.
+  // If orientation changes, the cached buffer is no longer valid.
+  freeCoverBuffer();
+  coverRendered = false;
+  updateRequired = true;
 }
 
 void HomeActivity::displayTaskLoop() {

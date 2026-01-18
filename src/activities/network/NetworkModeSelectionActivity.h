@@ -38,4 +38,5 @@ class NetworkModeSelectionActivity final : public Activity {
   void onEnter() override;
   void onExit() override;
   void loop() override;
+  void requestRedraw() override;
 };

@@ -118,6 +118,22 @@ bool CrossPointSettings::loadFromFile() {
     if (++settingsRead >= fileSettingsCount) break;
   } while (false);
 
+  // Normalize orientation value across versions.
+  // Legacy values:
+  // - 0: portrait
+  // - 1: landscape
+  // - 2: inverted (treat as portrait)
+  // - 3: landscape (alternate)
+  if (orientation == 1 || orientation == 3) {
+    orientation = CrossPointSettings::ORIENTATION::LANDSCAPE;
+  } else if (orientation == 0) {
+    orientation = CrossPointSettings::ORIENTATION::PORTRAIT;
+  } else if (orientation == 2) {
+    orientation = CrossPointSettings::ORIENTATION::PORTRAIT;
+  } else {
+    orientation = CrossPointSettings::ORIENTATION::PORTRAIT;
+  }
+
   inputFile.close();
   Serial.printf("[%lu] [CPS] Settings loaded from file\n", millis());
   return true;

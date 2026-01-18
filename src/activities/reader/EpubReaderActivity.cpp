@@ -5,6 +5,12 @@
 #include <GfxRenderer.h>
 #include <SDCardManager.h>
 
+#ifdef USE_M5UNIFIED
+#include <M5Unified.h>
+
+#include "touch/TouchEvent.h"
+#endif
+
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
 #include "EpubReaderChapterSelectionActivity.h"
@@ -24,6 +30,66 @@ void EpubReaderActivity::taskTrampoline(void* param) {
   self->displayTaskLoop();
 }
 
+#ifdef USE_M5UNIFIED
+bool EpubReaderActivity::onTouch(const TouchEvent& event) {
+  if (subActivity) {
+    return subActivity->onTouch(event);
+  }
+
+  if (event.type == TouchEvent::Type::SwipeUp) {
+    onGoHome();
+    return true;
+  }
+
+  if (event.type != TouchEvent::Type::Tap) {
+    return false;
+  }
+
+  const int w = renderer.getScreenWidth();
+  const int x = event.end.x;
+
+  if (x < w / 3) {
+    // Tap left: previous page
+    if (section) {
+      if (section->currentPage > 0) {
+        section->currentPage--;
+      } else {
+        xSemaphoreTake(renderingMutex, portMAX_DELAY);
+        nextPageNumber = UINT16_MAX;
+        currentSpineIndex--;
+        section.reset();
+        xSemaphoreGive(renderingMutex);
+      }
+      updateRequired = true;
+    }
+    return true;
+  }
+
+  if (x > (w * 2) / 3) {
+    // Tap right: next page
+    if (section) {
+      if (section->currentPage < section->pageCount - 1) {
+        section->currentPage++;
+      } else {
+        xSemaphoreTake(renderingMutex, portMAX_DELAY);
+        nextPageNumber = 0;
+        currentSpineIndex++;
+        section.reset();
+        xSemaphoreGive(renderingMutex);
+      }
+      updateRequired = true;
+    } else {
+      updateRequired = true;
+    }
+    return true;
+  }
+
+  // Tap center: toggle menu (for now open chapter selection)
+  pendingOpenChapterSelection = true;
+  return true;
+}
+#endif
+
 void EpubReaderActivity::onEnter() {
   ActivityWithSubactivity::onEnter();
 
@@ -31,23 +97,22 @@ void EpubReaderActivity::onEnter() {
     return;
   }
 
-  // Configure screen orientation based on settings
-  switch (SETTINGS.orientation) {
+  // Configure screen orientation based on settings.
+  // On touch/IMU devices (Paper S3), orientation is driven centrally in main loop.
+#ifndef USE_M5UNIFIED
+  switch (static_cast<CrossPointSettings::ORIENTATION>(SETTINGS.orientation)) {
     case CrossPointSettings::ORIENTATION::PORTRAIT:
       renderer.setOrientation(GfxRenderer::Orientation::Portrait);
       break;
-    case CrossPointSettings::ORIENTATION::LANDSCAPE_CW:
+    case CrossPointSettings::ORIENTATION::LANDSCAPE:
       renderer.setOrientation(GfxRenderer::Orientation::LandscapeClockwise);
       break;
-    case CrossPointSettings::ORIENTATION::INVERTED:
-      renderer.setOrientation(GfxRenderer::Orientation::PortraitInverted);
-      break;
-    case CrossPointSettings::ORIENTATION::LANDSCAPE_CCW:
-      renderer.setOrientation(GfxRenderer::Orientation::LandscapeCounterClockwise);
-      break;
+    case CrossPointSettings::ORIENTATION::AUTO:
     default:
+      renderer.setOrientation(GfxRenderer::Orientation::Portrait);
       break;
   }
+#endif
 
   renderingMutex = xSemaphoreCreateMutex();
 
@@ -95,16 +160,29 @@ void EpubReaderActivity::onExit() {
   // Reset orientation back to portrait for the rest of the UI
   renderer.setOrientation(GfxRenderer::Orientation::Portrait);
 
-  // Wait until not rendering to delete task to avoid killing mid-instruction to EPD
-  xSemaphoreTake(renderingMutex, portMAX_DELAY);
-  if (displayTaskHandle) {
+  if (renderingMutex) {
+    const bool locked = xSemaphoreTake(renderingMutex, pdMS_TO_TICKS(2000)) == pdTRUE;
+    if (displayTaskHandle) {
+      vTaskDelete(displayTaskHandle);
+      displayTaskHandle = nullptr;
+    }
+    if (locked) {
+      vSemaphoreDelete(renderingMutex);
+    }
+    renderingMutex = nullptr;
+  } else if (displayTaskHandle) {
     vTaskDelete(displayTaskHandle);
     displayTaskHandle = nullptr;
   }
-  vSemaphoreDelete(renderingMutex);
-  renderingMutex = nullptr;
   section.reset();
   epub.reset();
+}
+
+void EpubReaderActivity::requestRedraw() {
+  if (subActivity) {
+    subActivity->requestRedraw();
+  }
+  updateRequired = true;
 }
 
 void EpubReaderActivity::loop() {
@@ -115,7 +193,8 @@ void EpubReaderActivity::loop() {
   }
 
   // Enter chapter selection activity
-  if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
+  if (pendingOpenChapterSelection || mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
+    pendingOpenChapterSelection = false;
     // Don't start activity transition while rendering
     xSemaphoreTake(renderingMutex, portMAX_DELAY);
     exitActivity();

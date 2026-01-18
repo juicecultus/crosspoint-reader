@@ -23,8 +23,7 @@ const SettingInfo settingsList[settingsCount] = {
     SettingInfo::Toggle("Extra Paragraph Spacing", &CrossPointSettings::extraParagraphSpacing),
     SettingInfo::Toggle("Text Anti-Aliasing", &CrossPointSettings::textAntiAliasing),
     SettingInfo::Enum("Short Power Button Click", &CrossPointSettings::shortPwrBtn, {"Ignore", "Sleep", "Page Turn"}),
-    SettingInfo::Enum("Reading Orientation", &CrossPointSettings::orientation,
-                      {"Portrait", "Landscape CW", "Inverted", "Landscape CCW"}),
+    SettingInfo::Enum("Reading Orientation", &CrossPointSettings::orientation, {"Portrait", "Landscape", "Auto"}),
     SettingInfo::Enum("Front Button Layout", &CrossPointSettings::frontButtonLayout,
                       {"Bck, Cnfrm, Lft, Rght", "Lft, Rght, Bck, Cnfrm", "Lft, Bck, Cnfrm, Rght"}),
     SettingInfo::Enum("Side Button Layout (reader)", &CrossPointSettings::sideButtonLayout,
@@ -71,14 +70,28 @@ void SettingsActivity::onEnter() {
 void SettingsActivity::onExit() {
   ActivityWithSubactivity::onExit();
 
-  // Wait until not rendering to delete task to avoid killing mid-instruction to EPD
-  xSemaphoreTake(renderingMutex, portMAX_DELAY);
-  if (displayTaskHandle) {
+  if (renderingMutex) {
+    const bool locked = xSemaphoreTake(renderingMutex, pdMS_TO_TICKS(2000)) == pdTRUE;
+    if (displayTaskHandle) {
+      vTaskDelete(displayTaskHandle);
+      displayTaskHandle = nullptr;
+    }
+    if (locked) {
+      vSemaphoreDelete(renderingMutex);
+    }
+    renderingMutex = nullptr;
+  } else if (displayTaskHandle) {
     vTaskDelete(displayTaskHandle);
     displayTaskHandle = nullptr;
   }
-  vSemaphoreDelete(renderingMutex);
-  renderingMutex = nullptr;
+}
+
+void SettingsActivity::requestRedraw() {
+  if (subActivity) {
+    subActivity->requestRedraw();
+    return;
+  }
+  updateRequired = true;
 }
 
 void SettingsActivity::loop() {

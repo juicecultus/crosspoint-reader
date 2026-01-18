@@ -23,10 +23,9 @@ class CrossPointSettings {
   enum STATUS_BAR_MODE { NONE = 0, NO_PROGRESS = 1, FULL = 2 };
 
   enum ORIENTATION {
-    PORTRAIT = 0,      // 480x800 logical coordinates (current default)
-    LANDSCAPE_CW = 1,  // 800x480 logical coordinates, rotated 180° (swap top/bottom)
-    INVERTED = 2,      // 480x800 logical coordinates, inverted
-    LANDSCAPE_CCW = 3  // 800x480 logical coordinates, native panel orientation
+    PORTRAIT = 0,
+    LANDSCAPE = 1,
+    AUTO = 2
   };
 
   // Front button layout options
@@ -70,7 +69,7 @@ class CrossPointSettings {
   // Short power button click behaviour
   uint8_t shortPwrBtn = IGNORE;
   // EPUB reading orientation settings
-  // 0 = portrait (default), 1 = landscape clockwise, 2 = inverted, 3 = landscape counter-clockwise
+  // 0 = portrait, 1 = landscape, 2 = auto
   uint8_t orientation = PORTRAIT;
   // Button layouts
   uint8_t frontButtonLayout = BACK_CONFIRM_LEFT_RIGHT;

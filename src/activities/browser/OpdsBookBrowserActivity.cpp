@@ -54,15 +54,29 @@ void OpdsBookBrowserActivity::onExit() {
   // Turn off WiFi when exiting
   WiFi.mode(WIFI_OFF);
 
-  xSemaphoreTake(renderingMutex, portMAX_DELAY);
-  if (displayTaskHandle) {
+  if (renderingMutex) {
+    const bool locked = xSemaphoreTake(renderingMutex, pdMS_TO_TICKS(2000)) == pdTRUE;
+    if (displayTaskHandle) {
+      vTaskDelete(displayTaskHandle);
+      displayTaskHandle = nullptr;
+    }
+    if (locked) {
+      vSemaphoreDelete(renderingMutex);
+    }
+    renderingMutex = nullptr;
+  } else if (displayTaskHandle) {
     vTaskDelete(displayTaskHandle);
     displayTaskHandle = nullptr;
   }
-  vSemaphoreDelete(renderingMutex);
-  renderingMutex = nullptr;
   entries.clear();
   navigationHistory.clear();
+}
+
+void OpdsBookBrowserActivity::requestRedraw() {
+  if (subActivity) {
+    subActivity->requestRedraw();
+  }
+  updateRequired = true;
 }
 
 void OpdsBookBrowserActivity::loop() {

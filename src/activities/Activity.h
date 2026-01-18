@@ -8,6 +8,10 @@
 class MappedInputManager;
 class GfxRenderer;
 
+#ifdef USE_M5UNIFIED
+struct TouchEvent;
+#endif
+
 class Activity {
  protected:
   std::string name;
@@ -21,6 +25,12 @@ class Activity {
   virtual void onEnter() { Serial.printf("[%lu] [ACT] Entering activity: %s\n", millis(), name.c_str()); }
   virtual void onExit() { Serial.printf("[%lu] [ACT] Exiting activity: %s\n", millis(), name.c_str()); }
   virtual void loop() {}
+  virtual void requestRedraw() {}
+
+#ifdef USE_M5UNIFIED
+  virtual bool onTouch(const TouchEvent& /*event*/) { return false; }
+#endif
+
   virtual bool skipLoopDelay() { return false; }
   virtual bool preventAutoSleep() { return false; }
 };

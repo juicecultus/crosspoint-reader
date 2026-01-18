@@ -6,31 +6,29 @@
 void GfxRenderer::insertFont(const int fontId, EpdFontFamily font) { fontMap.insert({fontId, font}); }
 
 void GfxRenderer::rotateCoordinates(const int x, const int y, int* rotatedX, int* rotatedY) const {
+  const int w = EInkDisplay::DISPLAY_WIDTH;
+  const int h = EInkDisplay::DISPLAY_HEIGHT;
   switch (orientation) {
     case Portrait: {
-      // Logical portrait (480x800) → panel (800x480)
-      // Rotation: 90 degrees clockwise
-      *rotatedX = y;
-      *rotatedY = EInkDisplay::DISPLAY_HEIGHT - 1 - x;
-      break;
-    }
-    case LandscapeClockwise: {
-      // Logical landscape (800x480) rotated 180 degrees (swap top/bottom and left/right)
-      *rotatedX = EInkDisplay::DISPLAY_WIDTH - 1 - x;
-      *rotatedY = EInkDisplay::DISPLAY_HEIGHT - 1 - y;
+      *rotatedX = x;
+      *rotatedY = y;
       break;
     }
     case PortraitInverted: {
-      // Logical portrait (480x800) → panel (800x480)
-      // Rotation: 90 degrees counter-clockwise
-      *rotatedX = EInkDisplay::DISPLAY_WIDTH - 1 - y;
+      *rotatedX = w - 1 - x;
+      *rotatedY = h - 1 - y;
+      break;
+    }
+    case LandscapeClockwise: {
+      // Logical landscape (w' = h, h' = w) rotated 90° CW into portrait framebuffer.
+      *rotatedX = w - 1 - y;
       *rotatedY = x;
       break;
     }
     case LandscapeCounterClockwise: {
-      // Logical landscape (800x480) aligned with panel orientation
-      *rotatedX = x;
-      *rotatedY = y;
+      // Logical landscape (w' = h, h' = w) rotated 90° CCW into portrait framebuffer.
+      *rotatedX = y;
+      *rotatedY = h - 1 - x;
       break;
     }
   }
@@ -52,7 +50,12 @@ void GfxRenderer::drawPixel(const int x, const int y, const bool state) const {
   // Bounds checking against physical panel dimensions
   if (rotatedX < 0 || rotatedX >= EInkDisplay::DISPLAY_WIDTH || rotatedY < 0 ||
       rotatedY >= EInkDisplay::DISPLAY_HEIGHT) {
-    Serial.printf("[%lu] [GFX] !! Outside range (%d, %d) -> (%d, %d)\n", millis(), x, y, rotatedX, rotatedY);
+    static unsigned long lastOutsideLogMs = 0;
+    const unsigned long now = millis();
+    if (now - lastOutsideLogMs > 250) {
+      lastOutsideLogMs = now;
+      Serial.printf("[%lu] [GFX] !! Outside range (%d, %d) -> (%d, %d)\n", now, x, y, rotatedX, rotatedY);
+    }
     return;
   }
 
@@ -417,28 +420,24 @@ int GfxRenderer::getScreenWidth() const {
   switch (orientation) {
     case Portrait:
     case PortraitInverted:
-      // 480px wide in portrait logical coordinates
-      return EInkDisplay::DISPLAY_HEIGHT;
+      return EInkDisplay::DISPLAY_WIDTH;
     case LandscapeClockwise:
     case LandscapeCounterClockwise:
-      // 800px wide in landscape logical coordinates
-      return EInkDisplay::DISPLAY_WIDTH;
+      return EInkDisplay::DISPLAY_HEIGHT;
   }
-  return EInkDisplay::DISPLAY_HEIGHT;
+  return EInkDisplay::DISPLAY_WIDTH;
 }
 
 int GfxRenderer::getScreenHeight() const {
   switch (orientation) {
     case Portrait:
     case PortraitInverted:
-      // 800px tall in portrait logical coordinates
-      return EInkDisplay::DISPLAY_WIDTH;
+      return EInkDisplay::DISPLAY_HEIGHT;
     case LandscapeClockwise:
     case LandscapeCounterClockwise:
-      // 480px tall in landscape logical coordinates
-      return EInkDisplay::DISPLAY_HEIGHT;
+      return EInkDisplay::DISPLAY_WIDTH;
   }
-  return EInkDisplay::DISPLAY_WIDTH;
+  return EInkDisplay::DISPLAY_HEIGHT;
 }
 
 int GfxRenderer::getSpaceWidth(const int fontId) const {
@@ -470,30 +469,32 @@ int GfxRenderer::getLineHeight(const int fontId) const {
 
 void GfxRenderer::drawButtonHints(const int fontId, const char* btn1, const char* btn2, const char* btn3,
                                   const char* btn4) {
-  const Orientation orig_orientation = getOrientation();
-  setOrientation(Orientation::Portrait);
-
+  const int pageWidth = getScreenWidth();
   const int pageHeight = getScreenHeight();
-  constexpr int buttonWidth = 106;
-  constexpr int buttonHeight = 40;
-  constexpr int buttonY = 40;     // Distance from bottom
-  constexpr int textYOffset = 7;  // Distance from top of button to text baseline
-  constexpr int buttonPositions[] = {25, 130, 245, 350};
+
+  // Layout 4 equally sized buttons along the bottom.
+  const int buttonHeight = 40;
+  const int buttonYMargin = 40;   // Distance from bottom
+  const int textYOffset = 7;      // Distance from top of button to text baseline
+  const int outerMargin = 20;
+  const int gap = 8;
+  const int totalGap = gap * 3;
+  const int availableW = pageWidth - outerMargin * 2 - totalGap;
+  const int buttonWidth = availableW / 4;
+  const int y = pageHeight - buttonYMargin;
   const char* labels[] = {btn1, btn2, btn3, btn4};
 
   for (int i = 0; i < 4; i++) {
     // Only draw if the label is non-empty
     if (labels[i] != nullptr && labels[i][0] != '\0') {
-      const int x = buttonPositions[i];
-      fillRect(x, pageHeight - buttonY, buttonWidth, buttonHeight, false);
-      drawRect(x, pageHeight - buttonY, buttonWidth, buttonHeight);
+      const int x = outerMargin + i * (buttonWidth + gap);
+      fillRect(x, y, buttonWidth, buttonHeight, false);
+      drawRect(x, y, buttonWidth, buttonHeight);
       const int textWidth = getTextWidth(fontId, labels[i]);
       const int textX = x + (buttonWidth - 1 - textWidth) / 2;
-      drawText(fontId, textX, pageHeight - buttonY + textYOffset, labels[i]);
+      drawText(fontId, textX, y + textYOffset, labels[i]);
     }
   }
-
-  setOrientation(orig_orientation);
 }
 
 void GfxRenderer::drawSideButtonHints(const int fontId, const char* topBtn, const char* bottomBtn) const {

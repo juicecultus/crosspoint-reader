@@ -59,14 +59,24 @@ void EpubReaderChapterSelectionActivity::onEnter() {
 void EpubReaderChapterSelectionActivity::onExit() {
   Activity::onExit();
 
-  // Wait until not rendering to delete task to avoid killing mid-instruction to EPD
-  xSemaphoreTake(renderingMutex, portMAX_DELAY);
-  if (displayTaskHandle) {
+  if (renderingMutex) {
+    const bool locked = xSemaphoreTake(renderingMutex, pdMS_TO_TICKS(2000)) == pdTRUE;
+    if (displayTaskHandle) {
+      vTaskDelete(displayTaskHandle);
+      displayTaskHandle = nullptr;
+    }
+    if (locked) {
+      vSemaphoreDelete(renderingMutex);
+    }
+    renderingMutex = nullptr;
+  } else if (displayTaskHandle) {
     vTaskDelete(displayTaskHandle);
     displayTaskHandle = nullptr;
   }
-  vSemaphoreDelete(renderingMutex);
-  renderingMutex = nullptr;
+}
+
+void EpubReaderChapterSelectionActivity::requestRedraw() {
+  updateRequired = true;
 }
 
 void EpubReaderChapterSelectionActivity::loop() {
@@ -132,8 +142,10 @@ void EpubReaderChapterSelectionActivity::renderScreen() {
   for (int tocIndex = pageStartIndex; tocIndex < epub->getTocItemsCount() && tocIndex < pageStartIndex + pageItems;
        tocIndex++) {
     auto item = epub->getTocItem(tocIndex);
-    renderer.drawText(UI_10_FONT_ID, 20 + (item.level - 1) * 15, 60 + (tocIndex % pageItems) * 30, item.title.c_str(),
-                      tocIndex != selectorIndex);
+    const int indentX = 20 + (item.level - 1) * 15;
+    const int maxTextWidth = (pageWidth - 1) - indentX;
+    const std::string clipped = renderer.truncatedText(UI_10_FONT_ID, item.title.c_str(), maxTextWidth);
+    renderer.drawText(UI_10_FONT_ID, indentX, 60 + (tocIndex % pageItems) * 30, clipped.c_str(), tocIndex != selectorIndex);
   }
 
   const auto labels = mappedInput.mapLabels("« Back", "Select", "Up", "Down");

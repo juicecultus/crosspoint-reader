@@ -5,6 +5,12 @@
 #include <Serialization.h>
 #include <Utf8.h>
 
+#ifdef USE_M5UNIFIED
+#include <M5Unified.h>
+
+#include "touch/TouchEvent.h"
+#endif
+
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
 #include "MappedInputManager.h"
@@ -26,6 +32,46 @@ void TxtReaderActivity::taskTrampoline(void* param) {
   self->displayTaskLoop();
 }
 
+#ifdef USE_M5UNIFIED
+bool TxtReaderActivity::onTouch(const TouchEvent& event) {
+  if (subActivity) {
+    return subActivity->onTouch(event);
+  }
+
+  if (event.type == TouchEvent::Type::SwipeUp) {
+    onGoHome();
+    return true;
+  }
+
+  if (event.type != TouchEvent::Type::Tap) {
+    return false;
+  }
+
+  const int w = renderer.getScreenWidth();
+  const int x = event.end.x;
+
+  // Option A: left=prev, right=next, center=menu.
+  if (x < w / 3) {
+    if (currentPage > 0) {
+      currentPage--;
+      updateRequired = true;
+    }
+    return true;
+  }
+
+  if (x > (w * 2) / 3) {
+    if (currentPage < totalPages - 1) {
+      currentPage++;
+      updateRequired = true;
+    }
+    return true;
+  }
+
+  // Center tap: reserved for menu/chrome. For now consume it.
+  return true;
+}
+#endif
+
 void TxtReaderActivity::onEnter() {
   ActivityWithSubactivity::onEnter();
 
@@ -33,23 +79,22 @@ void TxtReaderActivity::onEnter() {
     return;
   }
 
-  // Configure screen orientation based on settings
-  switch (SETTINGS.orientation) {
+  // Configure screen orientation based on settings.
+  // On touch/IMU devices (Paper S3), orientation is driven centrally in main loop.
+#ifndef USE_M5UNIFIED
+  switch (static_cast<CrossPointSettings::ORIENTATION>(SETTINGS.orientation)) {
     case CrossPointSettings::ORIENTATION::PORTRAIT:
       renderer.setOrientation(GfxRenderer::Orientation::Portrait);
       break;
-    case CrossPointSettings::ORIENTATION::LANDSCAPE_CW:
+    case CrossPointSettings::ORIENTATION::LANDSCAPE:
       renderer.setOrientation(GfxRenderer::Orientation::LandscapeClockwise);
       break;
-    case CrossPointSettings::ORIENTATION::INVERTED:
-      renderer.setOrientation(GfxRenderer::Orientation::PortraitInverted);
-      break;
-    case CrossPointSettings::ORIENTATION::LANDSCAPE_CCW:
-      renderer.setOrientation(GfxRenderer::Orientation::LandscapeCounterClockwise);
-      break;
+    case CrossPointSettings::ORIENTATION::AUTO:
     default:
+      renderer.setOrientation(GfxRenderer::Orientation::Portrait);
       break;
   }
+#endif
 
   renderingMutex = xSemaphoreCreateMutex();
 
@@ -76,17 +121,30 @@ void TxtReaderActivity::onExit() {
   // Reset orientation back to portrait for the rest of the UI
   renderer.setOrientation(GfxRenderer::Orientation::Portrait);
 
-  // Wait until not rendering to delete task
-  xSemaphoreTake(renderingMutex, portMAX_DELAY);
-  if (displayTaskHandle) {
+  if (renderingMutex) {
+    const bool locked = xSemaphoreTake(renderingMutex, pdMS_TO_TICKS(2000)) == pdTRUE;
+    if (displayTaskHandle) {
+      vTaskDelete(displayTaskHandle);
+      displayTaskHandle = nullptr;
+    }
+    if (locked) {
+      vSemaphoreDelete(renderingMutex);
+    }
+    renderingMutex = nullptr;
+  } else if (displayTaskHandle) {
     vTaskDelete(displayTaskHandle);
     displayTaskHandle = nullptr;
   }
-  vSemaphoreDelete(renderingMutex);
-  renderingMutex = nullptr;
   pageOffsets.clear();
   currentPageLines.clear();
   txt.reset();
+}
+
+void TxtReaderActivity::requestRedraw() {
+  if (subActivity) {
+    subActivity->requestRedraw();
+  }
+  updateRequired = true;
 }
 
 void TxtReaderActivity::loop() {

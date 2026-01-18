@@ -7,10 +7,12 @@
 #include <SPI.h>
 #include <builtinFonts/all.h>
 
+#include <cmath>
 #include <cstring>
 
 #ifdef USE_M5UNIFIED
 #include <M5Unified.h>
+#include "touch/TouchManager.h"
 #endif
 
 #include <driver/gpio.h>
@@ -54,6 +56,10 @@ InputManager inputManager;
 MappedInputManager mappedInputManager(inputManager);
 GfxRenderer renderer(einkDisplay);
 Activity* currentActivity;
+
+#ifdef USE_M5UNIFIED
+TouchManager touchManager;
+#endif
 
 // Fonts
 EpdFont bookerly14RegularFont(&bookerly_14_regular);
@@ -255,6 +261,10 @@ void onGoToBrowser() {
 }
 
 void onGoHome() {
+#ifdef USE_M5UNIFIED
+  touchManager.ignoreFor(450);
+#endif
+  inputManager.ignoreFor(450);
   exitActivity();
   enterNewActivity(new HomeActivity(renderer, mappedInputManager, onContinueReading, onGoToReaderHome, onGoToSettings,
                                     onGoToFileTransfer, onGoToBrowser));
@@ -263,6 +273,12 @@ void onGoHome() {
 void setupDisplayAndFonts() {
   einkDisplay.begin();
   Serial.printf("[%lu] [   ] Display initialized\n", millis());
+
+#ifdef USE_M5UNIFIED
+  // Paper S3 default: portrait.
+  renderer.setOrientation(GfxRenderer::Orientation::Portrait);
+#endif
+
   renderer.insertFont(BOOKERLY_14_FONT_ID, bookerly14FontFamily);
 #ifndef OMIT_FONTS
   renderer.insertFont(BOOKERLY_12_FONT_ID, bookerly12FontFamily);
@@ -345,12 +361,97 @@ void setup() {
   waitForPowerRelease();
 }
 
+#ifdef USE_M5UNIFIED
+namespace {
+float lastImuAx = 0.0f;
+float lastImuAy = 0.0f;
+float lastImuAz = 0.0f;
+
+bool readImuAccel(float* ax, float* ay, float* az) {
+  if (!M5.Imu.isEnabled()) {
+    return false;
+  }
+  return M5.Imu.getAccel(ax, ay, az);
+}
+
+GfxRenderer::Orientation desiredOrientationFromImu() {
+  // BMI270 accel is available via M5Unified when internal_imu is enabled.
+  float ax = 0.0f, ay = 0.0f, az = 0.0f;
+  if (!readImuAccel(&ax, &ay, &az)) {
+    return GfxRenderer::Orientation::Portrait;
+  }
+
+  lastImuAx = ax;
+  lastImuAy = ay;
+  lastImuAz = az;
+
+  const float absX = fabsf(ax);
+  const float absY = fabsf(ay);
+
+  if (absX > absY) {
+    return (ax >= 0.0f) ? GfxRenderer::Orientation::LandscapeClockwise
+                        : GfxRenderer::Orientation::LandscapeCounterClockwise;
+  }
+
+  return (ay >= 0.0f) ? GfxRenderer::Orientation::PortraitInverted : GfxRenderer::Orientation::Portrait;
+}
+}
+#endif
+
 void loop() {
   static unsigned long maxLoopDuration = 0;
   const unsigned long loopStartTime = millis();
   static unsigned long lastMemPrint = 0;
 
+#ifdef USE_M5UNIFIED
+  const auto touchEvent = touchManager.poll();
+#endif
+
   inputManager.update();
+
+#ifdef USE_M5UNIFIED
+  // Auto-rotate using IMU (BMI270) with a debounce so we don't flicker between states.
+  static GfxRenderer::Orientation stableTarget = renderer.getOrientation();
+  static GfxRenderer::Orientation pendingTarget = stableTarget;
+  static unsigned long pendingSince = 0;
+  static unsigned long lastImuPoll = 0;
+
+  if (millis() - lastImuPoll >= 200) {
+    lastImuPoll = millis();
+    const auto mode = static_cast<CrossPointSettings::ORIENTATION>(SETTINGS.orientation);
+    const auto raw = desiredOrientationFromImu();
+
+    GfxRenderer::Orientation o = raw;
+    if (mode == CrossPointSettings::ORIENTATION::PORTRAIT) {
+      o = GfxRenderer::Orientation::Portrait;
+    } else if (mode == CrossPointSettings::ORIENTATION::LANDSCAPE) {
+      // Keep landscape, but allow IMU to pick CW vs CCW.
+      // If we're currently held in portrait, fall back to the last known X sign.
+      if (raw == GfxRenderer::Orientation::Portrait || raw == GfxRenderer::Orientation::PortraitInverted) {
+        o = (lastImuAx >= 0.0f) ? GfxRenderer::Orientation::LandscapeClockwise
+                                : GfxRenderer::Orientation::LandscapeCounterClockwise;
+      } else {
+        o = raw;
+      }
+    }
+
+    if (o != pendingTarget) {
+      pendingTarget = o;
+      pendingSince = millis();
+    }
+    if (pendingTarget != stableTarget && millis() - pendingSince >= 700) {
+      stableTarget = pendingTarget;
+      renderer.setOrientation(stableTarget);
+      if (Serial) {
+        Serial.printf("[%lu] [IMU] ax=%.3f ay=%.3f az=%.3f -> orientation=%d\n", millis(), lastImuAx, lastImuAy,
+                      lastImuAz, static_cast<int>(stableTarget));
+      }
+      if (currentActivity) {
+        currentActivity->requestRedraw();
+      }
+    }
+  }
+#endif
 
   if (Serial && millis() - lastMemPrint >= 10000) {
     Serial.printf("[%lu] [MEM] Free: %d bytes, Total: %d bytes, Min Free: %d bytes\n", millis(), ESP.getFreeHeap(),
@@ -361,6 +462,9 @@ void loop() {
   // Check for any user activity (button press or release) or active background work
   static unsigned long lastActivityTime = millis();
   if (inputManager.wasAnyPressed() || inputManager.wasAnyReleased() ||
+#ifdef USE_M5UNIFIED
+      touchEvent.has_value() ||
+#endif
       (currentActivity && currentActivity->preventAutoSleep())) {
     lastActivityTime = millis();  // Reset inactivity timer
   }
@@ -382,6 +486,11 @@ void loop() {
 
   const unsigned long activityStartTime = millis();
   if (currentActivity) {
+#ifdef USE_M5UNIFIED
+    if (touchEvent.has_value()) {
+      (void)currentActivity->onTouch(*touchEvent);
+    }
+#endif
     currentActivity->loop();
   }
   const unsigned long activityDuration = millis() - activityStartTime;

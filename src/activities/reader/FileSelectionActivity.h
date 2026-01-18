@@ -28,13 +28,14 @@ class FileSelectionActivity final : public Activity {
 
  public:
   explicit FileSelectionActivity(GfxRenderer& renderer, MappedInputManager& mappedInput,
-                                 const std::function<void(const std::string&)>& onSelect,
-                                 const std::function<void()>& onGoHome, std::string initialPath = "/")
+                                const std::function<void(const std::string&)>& onSelect,
+                                const std::function<void()>& onGoHome, std::string basepath = "/")
       : Activity("FileSelection", renderer, mappedInput),
-        basepath(initialPath.empty() ? "/" : std::move(initialPath)),
         onSelect(onSelect),
-        onGoHome(onGoHome) {}
+        onGoHome(onGoHome),
+        basepath(std::move(basepath)) {}
   void onEnter() override;
   void onExit() override;
   void loop() override;
+  void requestRedraw() override;
 };

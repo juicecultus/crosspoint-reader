@@ -7,6 +7,10 @@
 
 #include "activities/ActivityWithSubactivity.h"
 
+#ifdef USE_M5UNIFIED
+struct TouchEvent;
+#endif
+
 class EpubReaderActivity final : public ActivityWithSubactivity {
   std::shared_ptr<Epub> epub;
   std::unique_ptr<Section> section = nullptr;
@@ -16,6 +20,7 @@ class EpubReaderActivity final : public ActivityWithSubactivity {
   int nextPageNumber = 0;
   int pagesUntilFullRefresh = 0;
   bool updateRequired = false;
+  bool pendingOpenChapterSelection = false;
   const std::function<void()> onGoBack;
   const std::function<void()> onGoHome;
 
@@ -36,4 +41,9 @@ class EpubReaderActivity final : public ActivityWithSubactivity {
   void onEnter() override;
   void onExit() override;
   void loop() override;
+  void requestRedraw() override;
+
+#ifdef USE_M5UNIFIED
+  bool onTouch(const TouchEvent& event) override;
+#endif
 };

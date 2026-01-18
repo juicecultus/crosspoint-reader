@@ -65,13 +65,24 @@ void XtcReaderChapterSelectionActivity::onEnter() {
 void XtcReaderChapterSelectionActivity::onExit() {
   Activity::onExit();
 
-  xSemaphoreTake(renderingMutex, portMAX_DELAY);
-  if (displayTaskHandle) {
+  if (renderingMutex) {
+    const bool locked = xSemaphoreTake(renderingMutex, pdMS_TO_TICKS(2000)) == pdTRUE;
+    if (displayTaskHandle) {
+      vTaskDelete(displayTaskHandle);
+      displayTaskHandle = nullptr;
+    }
+    if (locked) {
+      vSemaphoreDelete(renderingMutex);
+    }
+    renderingMutex = nullptr;
+  } else if (displayTaskHandle) {
     vTaskDelete(displayTaskHandle);
     displayTaskHandle = nullptr;
   }
-  vSemaphoreDelete(renderingMutex);
-  renderingMutex = nullptr;
+}
+
+void XtcReaderChapterSelectionActivity::requestRedraw() {
+  updateRequired = true;
 }
 
 void XtcReaderChapterSelectionActivity::loop() {
@@ -146,7 +157,10 @@ void XtcReaderChapterSelectionActivity::renderScreen() {
   for (int i = pageStartIndex; i < static_cast<int>(chapters.size()) && i < pageStartIndex + pageItems; i++) {
     const auto& chapter = chapters[i];
     const char* title = chapter.name.empty() ? "Unnamed" : chapter.name.c_str();
-    renderer.drawText(UI_10_FONT_ID, 20, 60 + (i % pageItems) * 30, title, i != selectorIndex);
+    const int indentX = 20;
+    const int maxTextWidth = (pageWidth - 1) - indentX;
+    const std::string clipped = renderer.truncatedText(UI_10_FONT_ID, title, maxTextWidth);
+    renderer.drawText(UI_10_FONT_ID, indentX, 60 + (i % pageItems) * 30, clipped.c_str(), i != selectorIndex);
   }
 
   const auto labels = mappedInput.mapLabels("« Back", "Select", "Up", "Down");

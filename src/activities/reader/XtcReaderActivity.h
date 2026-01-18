@@ -14,6 +14,10 @@
 
 #include "activities/ActivityWithSubactivity.h"
 
+#ifdef USE_M5UNIFIED
+struct TouchEvent;
+#endif
+
 class XtcReaderActivity final : public ActivityWithSubactivity {
   std::shared_ptr<Xtc> xtc;
   TaskHandle_t displayTaskHandle = nullptr;
@@ -41,4 +45,9 @@ class XtcReaderActivity final : public ActivityWithSubactivity {
   void onEnter() override;
   void onExit() override;
   void loop() override;
+  void requestRedraw() override;
+
+#ifdef USE_M5UNIFIED
+  bool onTouch(const TouchEvent& event) override;
+#endif
 };

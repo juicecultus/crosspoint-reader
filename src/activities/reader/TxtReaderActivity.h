@@ -10,6 +10,10 @@
 #include "CrossPointSettings.h"
 #include "activities/ActivityWithSubactivity.h"
 
+#ifdef USE_M5UNIFIED
+struct TouchEvent;
+#endif
+
 class TxtReaderActivity final : public ActivityWithSubactivity {
   std::unique_ptr<Txt> txt;
   TaskHandle_t displayTaskHandle = nullptr;
@@ -57,4 +61,9 @@ class TxtReaderActivity final : public ActivityWithSubactivity {
   void onEnter() override;
   void onExit() override;
   void loop() override;
+  void requestRedraw() override;
+
+#ifdef USE_M5UNIFIED
+  bool onTouch(const TouchEvent& event) override;
+#endif
 };
