@@ -46,6 +46,21 @@ const SettingInfo settingsList[settingsCount] = {
                       {"1 page", "5 pages", "10 pages", "15 pages", "30 pages"}),
     SettingInfo::Action("Calibre Settings"),
     SettingInfo::Action("Check for updates")};
+
+int getSettingsPageItems(const GfxRenderer& renderer) {
+  constexpr int startY = 60;
+  constexpr int lineHeight = 60;
+
+  const int screenHeight = renderer.getScreenHeight();
+  const int endY = screenHeight - 60;
+
+  const int availableHeight = endY - startY;
+  int items = availableHeight / lineHeight;
+  if (items < 1) {
+    items = 1;
+  }
+  return items;
+}
 }  // namespace
 
 void SettingsActivity::taskTrampoline(void* param) {
@@ -88,11 +103,14 @@ bool SettingsActivity::onTouch(const TouchEvent& event) {
 
   // Settings rows: start at y=60, lineHeight=30 (must match render())
   constexpr int startY = 60;
-  constexpr int lineHeight = 30;
+  constexpr int lineHeight = 60;
   if (y >= startY) {
+    const int pageItems = getSettingsPageItems(renderer);
     const int idx = (y - startY) / lineHeight;
-    if (idx >= 0 && idx < settingsCount) {
-      selectedSettingIndex = idx;
+    const int pageStartIndex = selectedSettingIndex / pageItems * pageItems;
+    const int tappedIndex = pageStartIndex + idx;
+    if (tappedIndex >= 0 && tappedIndex < settingsCount) {
+      selectedSettingIndex = tappedIndex;
       pendingActivate = true;
       updateRequired = true;
       return true;
@@ -261,12 +279,20 @@ void SettingsActivity::render() const {
   // Draw header
   renderer.drawCenteredText(UI_12_FONT_ID, 15, "Settings", true, EpdFontFamily::BOLD);
 
-  // Draw selection
-  renderer.fillRect(0, 60 + selectedSettingIndex * 30 - 2, pageWidth - 1, 30);
+  constexpr int startY = 60;
+  constexpr int lineHeight = 60;
 
-  // Draw all settings
-  for (int i = 0; i < settingsCount; i++) {
-    const int settingY = 60 + i * 30;  // 30 pixels between settings
+  const int pageItems = getSettingsPageItems(renderer);
+  const int pageStartIndex = selectedSettingIndex / pageItems * pageItems;
+
+  // Draw selection
+  renderer.fillRect(0, startY + (selectedSettingIndex % pageItems) * lineHeight - 2, pageWidth - 1, lineHeight);
+
+  const int textYOffset = (lineHeight - renderer.getLineHeight(UI_10_FONT_ID)) / 2;
+
+  // Draw visible settings
+  for (int i = pageStartIndex; i < settingsCount && i < pageStartIndex + pageItems; i++) {
+    const int settingY = startY + (i - pageStartIndex) * lineHeight + textYOffset;
 
     // Draw setting name
     renderer.drawText(UI_10_FONT_ID, 20, settingY, settingsList[i].name, i != selectedSettingIndex);
@@ -289,10 +315,6 @@ void SettingsActivity::render() const {
   // Draw version text above button hints
   renderer.drawText(SMALL_FONT_ID, pageWidth - 20 - renderer.getTextWidth(SMALL_FONT_ID, CROSSPOINT_VERSION),
                     pageHeight - 60, CROSSPOINT_VERSION);
-
-  // Draw help text
-  const auto labels = mappedInput.mapLabels("Back", "Select", "", "");
-  renderer.drawButtonHints(UI_10_FONT_ID, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
 
   // Always use standard refresh for settings screen
   renderer.displayBuffer();
