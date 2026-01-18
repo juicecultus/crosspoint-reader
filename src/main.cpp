@@ -9,6 +9,13 @@
 
 #include <cstring>
 
+#ifdef USE_M5UNIFIED
+#include <M5Unified.h>
+#endif
+
+#include <driver/gpio.h>
+#include <esp_sleep.h>
+
 #include "Battery.h"
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
@@ -24,6 +31,8 @@
 #include "fontIds.h"
 
 #define SPI_FQ 40000000
+
+#ifndef USE_M5UNIFIED
 // Display SPI pins (custom pins for XteinkX4, not hardware SPI defaults)
 #define EPD_SCLK 8   // SPI Clock
 #define EPD_MOSI 10  // SPI MOSI (Master Out Slave In)
@@ -37,6 +46,10 @@
 #define SD_SPI_MISO 7
 
 EInkDisplay einkDisplay(EPD_SCLK, EPD_MOSI, EPD_CS, EPD_DC, EPD_RST, EPD_BUSY);
+#else
+// M5Unified backend does not use these pins; constructor args are ignored.
+EInkDisplay einkDisplay(-1, -1, -1, -1, -1, -1);
+#endif
 InputManager inputManager;
 MappedInputManager mappedInputManager(inputManager);
 GfxRenderer renderer(einkDisplay);
@@ -150,6 +163,9 @@ void enterNewActivity(Activity* activity) {
 
 // Verify long press on wake-up from deep sleep
 void verifyWakeupLongPress() {
+#ifdef USE_M5UNIFIED
+  return;
+#endif
   // Give the user up to 1000ms to start holding the power button, and must hold for SETTINGS.getPowerButtonDuration()
   const auto start = millis();
   bool abort = false;
@@ -181,7 +197,7 @@ void verifyWakeupLongPress() {
   if (abort) {
     // Button released too early. Returning to sleep.
     // IMPORTANT: Re-arm the wakeup trigger before sleeping again
-    esp_deep_sleep_enable_gpio_wakeup(1ULL << InputManager::POWER_BUTTON_PIN, ESP_GPIO_WAKEUP_GPIO_LOW);
+    esp_sleep_enable_ext0_wakeup(static_cast<gpio_num_t>(InputManager::POWER_BUTTON_PIN), 0);
     esp_deep_sleep_start();
   }
 }
@@ -202,11 +218,17 @@ void enterDeepSleep() {
   einkDisplay.deepSleep();
   Serial.printf("[%lu] [   ] Power button press calibration value: %lu ms\n", millis(), t2 - t1);
   Serial.printf("[%lu] [   ] Entering deep sleep.\n", millis());
-  esp_deep_sleep_enable_gpio_wakeup(1ULL << InputManager::POWER_BUTTON_PIN, ESP_GPIO_WAKEUP_GPIO_LOW);
+#ifdef USE_M5UNIFIED
+  M5.Power.powerOff();
+  delay(1000);
+  esp_deep_sleep_start();
+#else
+  esp_sleep_enable_ext0_wakeup(static_cast<gpio_num_t>(InputManager::POWER_BUTTON_PIN), 0);
   // Ensure that the power button has been released to avoid immediately turning back on if you're holding it
   waitForPowerRelease();
   // Enter Deep Sleep
   esp_deep_sleep_start();
+#endif
 }
 
 void onGoHome();
@@ -265,18 +287,24 @@ void setupDisplayAndFonts() {
 void setup() {
   t1 = millis();
 
+#ifdef USE_M5UNIFIED
+  Serial.begin(115200);
+#else
   // Only start serial if USB connected
   pinMode(UART0_RXD, INPUT);
   if (digitalRead(UART0_RXD) == HIGH) {
     Serial.begin(115200);
   }
+#endif
 
   inputManager.begin();
   // Initialize pins
   pinMode(BAT_GPIO0, INPUT);
 
+#ifndef USE_M5UNIFIED
   // Initialize SPI with custom pins
   SPI.begin(EPD_SCLK, SD_SPI_MISO, EPD_MOSI, EPD_CS);
+#endif
 
   // SD Card Initialization
   // We need 6 open files concurrently when parsing a new chapter

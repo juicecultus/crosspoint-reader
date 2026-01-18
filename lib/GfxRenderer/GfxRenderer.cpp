@@ -1,6 +1,7 @@
 #include "GfxRenderer.h"
 
 #include <Utf8.h>
+#include <string>
 
 void GfxRenderer::insertFont(const int fontId, EpdFontFamily font) { fontMap.insert({fontId, font}); }
 
@@ -682,17 +683,18 @@ bool GfxRenderer::storeBwBuffer() {
     }
 
     const size_t offset = i * BW_BUFFER_CHUNK_SIZE;
-    bwBufferChunks[i] = static_cast<uint8_t*>(malloc(BW_BUFFER_CHUNK_SIZE));
+    const size_t bytesThisChunk = std::min(BW_BUFFER_CHUNK_SIZE, static_cast<size_t>(EInkDisplay::BUFFER_SIZE) - offset);
+    bwBufferChunks[i] = static_cast<uint8_t*>(malloc(bytesThisChunk));
 
     if (!bwBufferChunks[i]) {
       Serial.printf("[%lu] [GFX] !! Failed to allocate BW buffer chunk %zu (%zu bytes)\n", millis(), i,
-                    BW_BUFFER_CHUNK_SIZE);
+                    bytesThisChunk);
       // Free previously allocated chunks
       freeBwBufferChunks();
       return false;
     }
 
-    memcpy(bwBufferChunks[i], frameBuffer + offset, BW_BUFFER_CHUNK_SIZE);
+    memcpy(bwBufferChunks[i], frameBuffer + offset, bytesThisChunk);
   }
 
   Serial.printf("[%lu] [GFX] Stored BW buffer in %zu chunks (%zu bytes each)\n", millis(), BW_BUFFER_NUM_CHUNKS,
@@ -736,7 +738,8 @@ void GfxRenderer::restoreBwBuffer() {
     }
 
     const size_t offset = i * BW_BUFFER_CHUNK_SIZE;
-    memcpy(frameBuffer + offset, bwBufferChunks[i], BW_BUFFER_CHUNK_SIZE);
+    const size_t bytesThisChunk = std::min(BW_BUFFER_CHUNK_SIZE, static_cast<size_t>(EInkDisplay::BUFFER_SIZE) - offset);
+    memcpy(frameBuffer + offset, bwBufferChunks[i], bytesThisChunk);
   }
 
   einkDisplay.cleanupGrayscaleBuffers(frameBuffer);

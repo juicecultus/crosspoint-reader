@@ -4,6 +4,10 @@
 #include <SDCardManager.h>
 #include <miniz.h>
 
+namespace {
+constexpr uint16_t ZIP_METHOD_STORE = 0;
+}
+
 bool inflateOneShot(const uint8_t* inputBuf, const size_t deflatedSize, uint8_t* outputBuf, const size_t inflatedSize) {
   // Setup inflator
   const auto inflator = static_cast<tinfl_decompressor*>(malloc(sizeof(tinfl_decompressor)));
@@ -302,7 +306,7 @@ uint8_t* ZipFile::readFileToMemory(const char* filename, size_t* size, const boo
     return nullptr;
   }
 
-  if (fileStat.method == MZ_NO_COMPRESSION) {
+  if (fileStat.method == ZIP_METHOD_STORE) {
     // no deflation, just read content
     const size_t dataRead = file.read(data, inflatedDataSize);
     if (!wasOpen) {
@@ -382,11 +386,11 @@ bool ZipFile::readFileToStream(const char* filename, Print& out, const size_t ch
   const auto deflatedDataSize = fileStat.compressedSize;
   const auto inflatedDataSize = fileStat.uncompressedSize;
 
-  if (fileStat.method == MZ_NO_COMPRESSION) {
+  if (fileStat.method == ZIP_METHOD_STORE) {
     // no deflation, just read content
     const auto buffer = static_cast<uint8_t*>(malloc(chunkSize));
     if (!buffer) {
-      Serial.printf("[%lu] [ZIP] Failed to allocate memory for buffer\n", millis());
+      Serial.printf("[%lu] [ZIP] Failed to allocate chunk buffer of %zu bytes\n", millis(), chunkSize);
       if (!wasOpen) {
         close();
       }
