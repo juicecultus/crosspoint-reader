@@ -9,6 +9,10 @@
 
 #include "../Activity.h"
 
+#ifdef USE_M5UNIFIED
+struct TouchEvent;
+#endif
+
 class FileSelectionActivity final : public Activity {
   TaskHandle_t displayTaskHandle = nullptr;
   SemaphoreHandle_t renderingMutex = nullptr;
@@ -16,6 +20,7 @@ class FileSelectionActivity final : public Activity {
   std::vector<std::string> files;
   size_t selectorIndex = 0;
   bool updateRequired = false;
+  bool pendingActivate = false;
   const std::function<void(const std::string&)> onSelect;
   const std::function<void()> onGoHome;
 
@@ -38,4 +43,8 @@ class FileSelectionActivity final : public Activity {
   void onExit() override;
   void loop() override;
   void requestRedraw() override;
+
+#ifdef USE_M5UNIFIED
+  bool onTouch(const TouchEvent& event) override;
+#endif
 };

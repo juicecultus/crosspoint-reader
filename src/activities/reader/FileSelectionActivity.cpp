@@ -7,6 +7,10 @@
 #include "fontIds.h"
 #include "util/StringUtils.h"
 
+#ifdef USE_M5UNIFIED
+#include "touch/TouchEvent.h"
+#endif
+
 namespace {
 constexpr int PAGE_ITEMS = 23;
 constexpr int SKIP_PAGE_MS = 700;
@@ -22,6 +26,77 @@ void sortFileList(std::vector<std::string>& strs) {
         [](const char& char1, const char& char2) { return tolower(char1) < tolower(char2); });
   });
 }
+
+#ifdef USE_M5UNIFIED
+bool FileSelectionActivity::onTouch(const TouchEvent& event) {
+  if (event.type == TouchEvent::Type::SwipeUp) {
+    if (files.empty()) {
+      return true;
+    }
+    selectorIndex = (selectorIndex + files.size() - 1) % files.size();
+    updateRequired = true;
+    return true;
+  }
+
+  if (event.type == TouchEvent::Type::SwipeDown) {
+    if (files.empty()) {
+      return true;
+    }
+    selectorIndex = (selectorIndex + 1) % files.size();
+    updateRequired = true;
+    return true;
+  }
+
+  if (event.type != TouchEvent::Type::Tap) {
+    return false;
+  }
+
+  const int w = renderer.getScreenWidth();
+  const int h = renderer.getScreenHeight();
+  const int x = event.end.x;
+  const int y = event.end.y;
+
+  // Bottom-left: go up one directory (or home if at root)
+  if (y > h - 80 && x < w / 3) {
+    if (basepath != "/") {
+      const std::string oldPath = basepath;
+      basepath.replace(basepath.find_last_of('/'), std::string::npos, "");
+      if (basepath.empty()) {
+        basepath = "/";
+      }
+      loadFiles();
+
+      const auto pos = oldPath.find_last_of('/');
+      const std::string dirName = oldPath.substr(pos + 1) + "/";
+      selectorIndex = findEntry(dirName);
+
+      updateRequired = true;
+    } else {
+      onGoHome();
+    }
+    return true;
+  }
+
+  // Rows: start at y=60, lineHeight=30, paged by PAGE_ITEMS (must match render())
+  constexpr int startY = 60;
+  constexpr int lineHeight = 30;
+  if (y >= startY && !files.empty()) {
+    const int row = (y - startY) / lineHeight;
+    if (row >= 0 && row < PAGE_ITEMS) {
+      const size_t pageStartIndex = (selectorIndex / PAGE_ITEMS) * PAGE_ITEMS;
+      const size_t tappedIndex = pageStartIndex + static_cast<size_t>(row);
+      if (tappedIndex < files.size()) {
+        selectorIndex = tappedIndex;
+        pendingActivate = true;
+        updateRequired = true;
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+#endif
 
 void FileSelectionActivity::taskTrampoline(void* param) {
   auto* self = static_cast<FileSelectionActivity*>(param);
@@ -107,6 +182,29 @@ void FileSelectionActivity::onExit() {
 }
 
 void FileSelectionActivity::loop() {
+#ifdef USE_M5UNIFIED
+  if (pendingActivate) {
+    pendingActivate = false;
+    if (files.empty()) {
+      return;
+    }
+
+    if (basepath.back() != '/') {
+      basepath += "/";
+    }
+
+    if (files[selectorIndex].back() == '/') {
+      basepath += files[selectorIndex].substr(0, files[selectorIndex].length() - 1);
+      loadFiles();
+      selectorIndex = 0;
+      updateRequired = true;
+    } else {
+      onSelect(basepath + files[selectorIndex]);
+    }
+    return;
+  }
+#endif
+
   // Long press BACK (1s+) goes to root folder
   if (mappedInput.isPressed(MappedInputManager::Button::Back) && mappedInput.getHeldTime() >= GO_HOME_MS) {
     if (basepath != "/") {

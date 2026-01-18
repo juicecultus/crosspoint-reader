@@ -10,6 +10,10 @@
 
 #include "../ActivityWithSubactivity.h"
 
+#ifdef USE_M5UNIFIED
+struct TouchEvent;
+#endif
+
 /**
  * Activity for browsing and downloading books from an OPDS server.
  * Supports navigation through catalog hierarchy and downloading EPUBs.
@@ -35,6 +39,10 @@ class OpdsBookBrowserActivity final : public ActivityWithSubactivity {
   void loop() override;
   void requestRedraw() override;
 
+#ifdef USE_M5UNIFIED
+  bool onTouch(const TouchEvent& event) override;
+#endif
+
  private:
   TaskHandle_t displayTaskHandle = nullptr;
   SemaphoreHandle_t renderingMutex = nullptr;
@@ -45,6 +53,7 @@ class OpdsBookBrowserActivity final : public ActivityWithSubactivity {
   std::vector<std::string> navigationHistory;  // Stack of previous feed paths for back navigation
   std::string currentPath;                     // Current feed path being displayed
   int selectorIndex = 0;
+  bool pendingActivate = false;
   std::string errorMessage;
   std::string statusMessage;
   size_t downloadProgress = 0;

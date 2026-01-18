@@ -5,6 +5,10 @@
 #include "MappedInputManager.h"
 #include "fontIds.h"
 
+#ifdef USE_M5UNIFIED
+#include "touch/TouchEvent.h"
+#endif
+
 namespace {
 // Time threshold for treating a long press as a page-up/page-down
 constexpr int SKIP_PAGE_MS = 700;
@@ -25,8 +29,72 @@ int EpubReaderChapterSelectionActivity::getPageItems() const {
   if (items < 1) {
     items = 1;
   }
+
   return items;
 }
+
+#ifdef USE_M5UNIFIED
+bool EpubReaderChapterSelectionActivity::onTouch(const TouchEvent& event) {
+  if (event.type == TouchEvent::Type::SwipeUp) {
+    const int total = epub ? epub->getTocItemsCount() : 0;
+    if (total <= 0) {
+      return true;
+    }
+    selectorIndex = (selectorIndex + total - 1) % total;
+    updateRequired = true;
+    return true;
+  }
+
+  if (event.type == TouchEvent::Type::SwipeDown) {
+    const int total = epub ? epub->getTocItemsCount() : 0;
+    if (total <= 0) {
+      return true;
+    }
+    selectorIndex = (selectorIndex + 1) % total;
+    updateRequired = true;
+    return true;
+  }
+
+  if (event.type != TouchEvent::Type::Tap) {
+    return false;
+  }
+
+  const int w = renderer.getScreenWidth();
+  const int h = renderer.getScreenHeight();
+  const int x = event.end.x;
+  const int y = event.end.y;
+
+  // Bottom-left: Back
+  if (y > h - 80 && x < w / 3) {
+    onGoBack();
+    return true;
+  }
+
+  // Rows: startY=60, lineHeight=30
+  constexpr int startY = 60;
+  constexpr int lineHeight = 30;
+  if (!epub || y < startY) {
+    return false;
+  }
+
+  const int pageItems = getPageItems();
+  const int row = (y - startY) / lineHeight;
+  if (row < 0 || row >= pageItems) {
+    return false;
+  }
+
+  const int pageStartIndex = selectorIndex / pageItems * pageItems;
+  const int tappedIndex = pageStartIndex + row;
+  if (tappedIndex >= 0 && tappedIndex < epub->getTocItemsCount()) {
+    selectorIndex = tappedIndex;
+    pendingActivate = true;
+    updateRequired = true;
+    return true;
+  }
+
+  return false;
+}
+#endif
 
 void EpubReaderChapterSelectionActivity::taskTrampoline(void* param) {
   auto* self = static_cast<EpubReaderChapterSelectionActivity*>(param);
@@ -80,6 +148,19 @@ void EpubReaderChapterSelectionActivity::requestRedraw() {
 }
 
 void EpubReaderChapterSelectionActivity::loop() {
+#ifdef USE_M5UNIFIED
+  if (pendingActivate) {
+    pendingActivate = false;
+    const auto newSpineIndex = epub->getSpineIndexForTocIndex(selectorIndex);
+    if (newSpineIndex == -1) {
+      onGoBack();
+    } else {
+      onSelectSpineIndex(newSpineIndex);
+    }
+    return;
+  }
+#endif
+
   const bool prevReleased = mappedInput.wasReleased(MappedInputManager::Button::Up) ||
                             mappedInput.wasReleased(MappedInputManager::Button::Left);
   const bool nextReleased = mappedInput.wasReleased(MappedInputManager::Button::Down) ||

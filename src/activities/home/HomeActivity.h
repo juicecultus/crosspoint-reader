@@ -7,11 +7,16 @@
 
 #include "../Activity.h"
 
+#ifdef USE_M5UNIFIED
+struct TouchEvent;
+#endif
+
 class HomeActivity final : public Activity {
   TaskHandle_t displayTaskHandle = nullptr;
   SemaphoreHandle_t renderingMutex = nullptr;
   int selectorIndex = 0;
   bool updateRequired = false;
+  bool pendingActivate = false;
   bool hasContinueReading = false;
   bool hasOpdsUrl = false;
   bool hasCoverImage = false;
@@ -50,4 +55,8 @@ class HomeActivity final : public Activity {
   void onExit() override;
   void loop() override;
   void requestRedraw() override;
+
+#ifdef USE_M5UNIFIED
+  bool onTouch(const TouchEvent& event) override;
+#endif
 };

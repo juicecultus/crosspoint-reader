@@ -10,10 +10,128 @@
 #include "activities/util/KeyboardEntryActivity.h"
 #include "fontIds.h"
 
+#ifdef USE_M5UNIFIED
+#include "touch/TouchEvent.h"
+#endif
+
 void WifiSelectionActivity::taskTrampoline(void* param) {
   auto* self = static_cast<WifiSelectionActivity*>(param);
   self->displayTaskLoop();
 }
+
+#ifdef USE_M5UNIFIED
+bool WifiSelectionActivity::onTouch(const TouchEvent& event) {
+  if (subActivity) {
+    return subActivity->onTouch(event);
+  }
+
+  if (event.type == TouchEvent::Type::Tap) {
+    const int w = renderer.getScreenWidth();
+    const int h = renderer.getScreenHeight();
+    const int x = event.end.x;
+    const int y = event.end.y;
+
+    // Bottom-left: cancel/back
+    if (y > h - 80 && x < w / 3) {
+      if (state == WifiSelectionState::NETWORK_LIST) {
+        onComplete(false);
+      } else if (state == WifiSelectionState::SAVE_PROMPT) {
+        onComplete(true);
+      } else if (state == WifiSelectionState::FORGET_PROMPT || state == WifiSelectionState::CONNECTION_FAILED) {
+        state = WifiSelectionState::NETWORK_LIST;
+        updateRequired = true;
+      }
+      return true;
+    }
+  }
+
+  if (state == WifiSelectionState::NETWORK_LIST) {
+    if (event.type == TouchEvent::Type::SwipeUp) {
+      if (selectedNetworkIndex > 0) {
+        selectedNetworkIndex--;
+        updateRequired = true;
+      }
+      return true;
+    }
+    if (event.type == TouchEvent::Type::SwipeDown) {
+      if (!networks.empty() && selectedNetworkIndex < static_cast<int>(networks.size()) - 1) {
+        selectedNetworkIndex++;
+        updateRequired = true;
+      }
+      return true;
+    }
+
+    if (event.type != TouchEvent::Type::Tap) {
+      return false;
+    }
+
+    const int y = event.end.y;
+    constexpr int startY = 60;
+    constexpr int lineHeight = 25;
+    const int pageHeight = renderer.getScreenHeight();
+    const int maxVisibleNetworks = (pageHeight - startY - 40) / lineHeight;
+
+    int scrollOffset = 0;
+    if (selectedNetworkIndex >= maxVisibleNetworks) {
+      scrollOffset = selectedNetworkIndex - maxVisibleNetworks + 1;
+    }
+
+    if (y < startY) {
+      return false;
+    }
+    const int row = (y - startY) / lineHeight;
+    if (row < 0 || row >= maxVisibleNetworks) {
+      return false;
+    }
+
+    const int tappedIndex = scrollOffset + row;
+    if (tappedIndex >= 0 && tappedIndex < static_cast<int>(networks.size())) {
+      selectedNetworkIndex = tappedIndex;
+      pendingActivate = true;
+      updateRequired = true;
+      return true;
+    }
+
+    // If no networks, allow tap anywhere in list area to rescan
+    if (networks.empty()) {
+      pendingActivate = true;
+      updateRequired = true;
+      return true;
+    }
+
+    return false;
+  }
+
+  if (state == WifiSelectionState::SAVE_PROMPT || state == WifiSelectionState::FORGET_PROMPT) {
+    if (event.type == TouchEvent::Type::SwipeLeft) {
+      if (state == WifiSelectionState::SAVE_PROMPT) {
+        savePromptSelection = 0;
+      } else {
+        forgetPromptSelection = 0;
+      }
+      updateRequired = true;
+      return true;
+    }
+    if (event.type == TouchEvent::Type::SwipeRight) {
+      if (state == WifiSelectionState::SAVE_PROMPT) {
+        savePromptSelection = 1;
+      } else {
+        forgetPromptSelection = 1;
+      }
+      updateRequired = true;
+      return true;
+    }
+    if (event.type == TouchEvent::Type::Tap) {
+      // Any tap (not back zone) confirms current selection.
+      pendingActivate = true;
+      updateRequired = true;
+      return true;
+    }
+  }
+
+  return false;
+}
+#endif
 
 void WifiSelectionActivity::onEnter() {
   Activity::onEnter();
@@ -297,6 +415,44 @@ void WifiSelectionActivity::loop() {
     subActivity->loop();
     return;
   }
+
+#ifdef USE_M5UNIFIED
+  if (pendingActivate) {
+    pendingActivate = false;
+    if (state == WifiSelectionState::NETWORK_LIST) {
+      if (!networks.empty()) {
+        selectNetwork(selectedNetworkIndex);
+      } else {
+        startWifiScan();
+      }
+      return;
+    }
+    if (state == WifiSelectionState::SAVE_PROMPT) {
+      if (savePromptSelection == 0) {
+        xSemaphoreTake(renderingMutex, portMAX_DELAY);
+        WIFI_STORE.addCredential(selectedSSID, enteredPassword);
+        xSemaphoreGive(renderingMutex);
+      }
+      onComplete(true);
+      return;
+    }
+    if (state == WifiSelectionState::FORGET_PROMPT) {
+      if (forgetPromptSelection == 0) {
+        xSemaphoreTake(renderingMutex, portMAX_DELAY);
+        WIFI_STORE.removeCredential(selectedSSID);
+        xSemaphoreGive(renderingMutex);
+        const auto network = find_if(networks.begin(), networks.end(),
+                                     [this](const WifiNetworkInfo& net) { return net.ssid == selectedSSID; });
+        if (network != networks.end()) {
+          network->hasSavedPassword = false;
+        }
+      }
+      state = WifiSelectionState::NETWORK_LIST;
+      updateRequired = true;
+      return;
+    }
+  }
+#endif
 
   // Check scan progress
   if (state == WifiSelectionState::SCANNING) {

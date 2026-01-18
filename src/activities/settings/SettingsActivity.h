@@ -9,6 +9,10 @@
 
 #include "activities/ActivityWithSubactivity.h"
 
+#ifdef USE_M5UNIFIED
+struct TouchEvent;
+#endif
+
 class CrossPointSettings;
 
 enum class SettingType { TOGGLE, ENUM, ACTION, VALUE };
@@ -49,6 +53,7 @@ class SettingsActivity final : public ActivityWithSubactivity {
   SemaphoreHandle_t renderingMutex = nullptr;
   bool updateRequired = false;
   int selectedSettingIndex = 0;  // Currently selected setting
+  bool pendingActivate = false;
   const std::function<void()> onGoHome;
 
   static void taskTrampoline(void* param);
@@ -64,4 +69,8 @@ class SettingsActivity final : public ActivityWithSubactivity {
   void onExit() override;
   void loop() override;
   void requestRedraw() override;
+
+#ifdef USE_M5UNIFIED
+  bool onTouch(const TouchEvent& event) override;
+#endif
 };

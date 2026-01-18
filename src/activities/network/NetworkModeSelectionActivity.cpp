@@ -5,6 +5,10 @@
 #include "MappedInputManager.h"
 #include "fontIds.h"
 
+#ifdef USE_M5UNIFIED
+#include "touch/TouchEvent.h"
+#endif
+
 namespace {
 constexpr int MENU_ITEM_COUNT = 2;
 const char* MENU_ITEMS[MENU_ITEM_COUNT] = {"Join a Network", "Create Hotspot"};
@@ -16,6 +20,52 @@ void NetworkModeSelectionActivity::taskTrampoline(void* param) {
   auto* self = static_cast<NetworkModeSelectionActivity*>(param);
   self->displayTaskLoop();
 }
+
+#ifdef USE_M5UNIFIED
+bool NetworkModeSelectionActivity::onTouch(const TouchEvent& event) {
+  if (event.type == TouchEvent::Type::SwipeUp) {
+    selectedIndex = (selectedIndex + MENU_ITEM_COUNT - 1) % MENU_ITEM_COUNT;
+    updateRequired = true;
+    return true;
+  }
+
+  if (event.type == TouchEvent::Type::SwipeDown) {
+    selectedIndex = (selectedIndex + 1) % MENU_ITEM_COUNT;
+    updateRequired = true;
+    return true;
+  }
+
+  if (event.type != TouchEvent::Type::Tap) {
+    return false;
+  }
+
+  const int w = renderer.getScreenWidth();
+  const int h = renderer.getScreenHeight();
+  const int x = event.end.x;
+  const int y = event.end.y;
+
+  // Bottom-left: Back
+  if (y > h - 80 && x < w / 3) {
+    onCancel();
+    return true;
+  }
+
+  // Tap one of the two options
+  constexpr int itemHeight = 50;
+  const int startY = (h - (MENU_ITEM_COUNT * itemHeight)) / 2 + 10;
+  for (int i = 0; i < MENU_ITEM_COUNT; i++) {
+    const int itemY = startY + i * itemHeight;
+    if (y >= itemY - 2 && y < itemY - 2 + itemHeight - 6) {
+      selectedIndex = i;
+      pendingActivate = true;
+      updateRequired = true;
+      return true;
+    }
+  }
+
+  return false;
+}
+#endif
 
 void NetworkModeSelectionActivity::onEnter() {
   Activity::onEnter();
@@ -54,6 +104,15 @@ void NetworkModeSelectionActivity::onExit() {
 }
 
 void NetworkModeSelectionActivity::loop() {
+#ifdef USE_M5UNIFIED
+  if (pendingActivate) {
+    pendingActivate = false;
+    const NetworkMode mode = (selectedIndex == 0) ? NetworkMode::JOIN_NETWORK : NetworkMode::CREATE_HOTSPOT;
+    onModeSelected(mode);
+    return;
+  }
+#endif
+
   // Handle back button - cancel
   if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
     onCancel();

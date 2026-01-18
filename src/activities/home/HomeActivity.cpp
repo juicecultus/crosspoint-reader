@@ -17,10 +17,97 @@
 #include "fontIds.h"
 #include "util/StringUtils.h"
 
+#ifdef USE_M5UNIFIED
+#include "touch/TouchEvent.h"
+#endif
+
 void HomeActivity::taskTrampoline(void* param) {
   auto* self = static_cast<HomeActivity*>(param);
   self->displayTaskLoop();
 }
+
+#ifdef USE_M5UNIFIED
+bool HomeActivity::onTouch(const TouchEvent& event) {
+  if (event.type == TouchEvent::Type::SwipeUp) {
+    const int menuCount = getMenuItemCount();
+    if (menuCount <= 0) {
+      return true;
+    }
+    selectorIndex = (selectorIndex + menuCount - 1) % menuCount;
+    updateRequired = true;
+    return true;
+  }
+
+  if (event.type == TouchEvent::Type::SwipeDown) {
+    const int menuCount = getMenuItemCount();
+    if (menuCount <= 0) {
+      return true;
+    }
+    selectorIndex = (selectorIndex + 1) % menuCount;
+    updateRequired = true;
+    return true;
+  }
+
+  if (event.type != TouchEvent::Type::Tap) {
+    return false;
+  }
+
+  const int w = renderer.getScreenWidth();
+  const int h = renderer.getScreenHeight();
+  const int x = event.end.x;
+  const int y = event.end.y;
+
+  // Book card bounds (must match render())
+  const int bookWidth = w / 2;
+  const int bookHeight = h / 2;
+  const int bookX = (w - bookWidth) / 2;
+  constexpr int bookY = 30;
+
+  const bool tappedBookCard = (x >= bookX && x < bookX + bookWidth && y >= bookY && y < bookY + bookHeight);
+  if (tappedBookCard) {
+    if (hasContinueReading) {
+      selectorIndex = 0;
+      pendingActivate = true;
+    }
+    updateRequired = true;
+    return true;
+  }
+
+  // Menu tiles bounds (must match render())
+  constexpr int margin = 20;
+  constexpr int bottomMargin = 60;
+  const int menuTileWidth = w - 2 * margin;
+  constexpr int menuTileHeight = 45;
+  constexpr int menuSpacing = 8;
+
+  const bool hasMenuContinueSlot = hasContinueReading;
+
+  int menuItemsCount = 3;
+  if (hasOpdsUrl) {
+    menuItemsCount++;
+  }
+
+  const int totalMenuHeight = menuItemsCount * menuTileHeight + (menuItemsCount - 1) * menuSpacing;
+  int menuStartY = bookY + bookHeight + 15;
+  const int maxMenuStartY = h - bottomMargin - totalMenuHeight - margin;
+  if (menuStartY > maxMenuStartY) {
+    menuStartY = maxMenuStartY;
+  }
+
+  for (int i = 0; i < menuItemsCount; i++) {
+    const int tileX = margin;
+    const int tileY = menuStartY + i * (menuTileHeight + menuSpacing);
+    if (x >= tileX && x < tileX + menuTileWidth && y >= tileY && y < tileY + menuTileHeight) {
+      selectorIndex = i + (hasMenuContinueSlot ? 1 : 0);
+      pendingActivate = true;
+      updateRequired = true;
+      return true;
+    }
+  }
+
+  return false;
+}
+#endif
 
 int HomeActivity::getMenuItemCount() const {
   int count = 3;  // Browse files, File transfer, Settings
@@ -164,6 +251,38 @@ void HomeActivity::freeCoverBuffer() {
 }
 
 void HomeActivity::loop() {
+#ifdef USE_M5UNIFIED
+  if (pendingActivate) {
+    pendingActivate = false;
+    const int menuCount = getMenuItemCount();
+
+    // Calculate dynamic indices based on which options are available
+    int idx = 0;
+    const int continueIdx = hasContinueReading ? idx++ : -1;
+    const int browseFilesIdx = idx++;
+    const int opdsLibraryIdx = hasOpdsUrl ? idx++ : -1;
+    const int fileTransferIdx = idx++;
+    const int settingsIdx = idx;
+
+    if (selectorIndex < 0 || selectorIndex >= menuCount) {
+      return;
+    }
+
+    if (selectorIndex == continueIdx) {
+      onContinueReading();
+    } else if (selectorIndex == browseFilesIdx) {
+      onReaderOpen();
+    } else if (selectorIndex == opdsLibraryIdx) {
+      onOpdsBrowserOpen();
+    } else if (selectorIndex == fileTransferIdx) {
+      onFileTransferOpen();
+    } else if (selectorIndex == settingsIdx) {
+      onSettingsOpen();
+    }
+    return;
+  }
+#endif
+
   const bool prevPressed = mappedInput.wasPressed(MappedInputManager::Button::Up) ||
                            mappedInput.wasPressed(MappedInputManager::Button::Left);
   const bool nextPressed = mappedInput.wasPressed(MappedInputManager::Button::Down) ||

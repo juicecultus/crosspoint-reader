@@ -7,6 +7,10 @@
 
 #include "../Activity.h"
 
+#ifdef USE_M5UNIFIED
+struct TouchEvent;
+#endif
+
 // Enum for network mode selection
 enum class NetworkMode { JOIN_NETWORK, CREATE_HOTSPOT };
 
@@ -23,6 +27,7 @@ class NetworkModeSelectionActivity final : public Activity {
   SemaphoreHandle_t renderingMutex = nullptr;
   int selectedIndex = 0;
   bool updateRequired = false;
+  bool pendingActivate = false;
   const std::function<void(NetworkMode)> onModeSelected;
   const std::function<void()> onCancel;
 
@@ -39,4 +44,8 @@ class NetworkModeSelectionActivity final : public Activity {
   void onExit() override;
   void loop() override;
   void requestRedraw() override;
+
+#ifdef USE_M5UNIFIED
+  bool onTouch(const TouchEvent& event) override;
+#endif
 };

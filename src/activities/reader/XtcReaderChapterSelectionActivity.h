@@ -8,6 +8,10 @@
 
 #include "../Activity.h"
 
+#ifdef USE_M5UNIFIED
+struct TouchEvent;
+#endif
+
 class XtcReaderChapterSelectionActivity final : public Activity {
   std::shared_ptr<Xtc> xtc;
   TaskHandle_t displayTaskHandle = nullptr;
@@ -15,6 +19,7 @@ class XtcReaderChapterSelectionActivity final : public Activity {
   uint32_t currentPage = 0;
   int selectorIndex = 0;
   bool updateRequired = false;
+  bool pendingActivate = false;
   const std::function<void()> onGoBack;
   const std::function<void(uint32_t newPage)> onSelectPage;
 
@@ -39,4 +44,8 @@ class XtcReaderChapterSelectionActivity final : public Activity {
   void onExit() override;
   void loop() override;
   void requestRedraw() override;
+
+#ifdef USE_M5UNIFIED
+  bool onTouch(const TouchEvent& event) override;
+#endif
 };

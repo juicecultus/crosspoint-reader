@@ -13,6 +13,10 @@
 #include "util/StringUtils.h"
 #include "util/UrlUtils.h"
 
+#ifdef USE_M5UNIFIED
+#include "touch/TouchEvent.h"
+#endif
+
 namespace {
 constexpr int PAGE_ITEMS = 23;
 constexpr int SKIP_PAGE_MS = 700;
@@ -131,6 +135,21 @@ void OpdsBookBrowserActivity::loop() {
 
   // Handle browsing state
   if (state == BrowserState::BROWSING) {
+#ifdef USE_M5UNIFIED
+    if (pendingActivate) {
+      pendingActivate = false;
+      if (!entries.empty()) {
+        const auto& entry = entries[selectorIndex];
+        if (entry.type == OpdsEntryType::BOOK) {
+          downloadBook(entry);
+        } else {
+          navigateToEntry(entry);
+        }
+      }
+      return;
+    }
+#endif
+
     const bool prevReleased = mappedInput.wasReleased(MappedInputManager::Button::Up) ||
                               mappedInput.wasReleased(MappedInputManager::Button::Left);
     const bool nextReleased = mappedInput.wasReleased(MappedInputManager::Button::Down) ||
@@ -165,6 +184,81 @@ void OpdsBookBrowserActivity::loop() {
     }
   }
 }
+
+#ifdef USE_M5UNIFIED
+bool OpdsBookBrowserActivity::onTouch(const TouchEvent& event) {
+  if (state == BrowserState::WIFI_SELECTION) {
+    return ActivityWithSubactivity::onTouch(event);
+  }
+
+  if (event.type == TouchEvent::Type::Tap) {
+    const int w = renderer.getScreenWidth();
+    const int h = renderer.getScreenHeight();
+    const int x = event.end.x;
+    const int y = event.end.y;
+
+    // Bottom-left: Back
+    if (y > h - 80 && x < w / 3) {
+      if (state == BrowserState::BROWSING || state == BrowserState::ERROR || state == BrowserState::LOADING) {
+        navigateBack();
+      } else if (state == BrowserState::CHECK_WIFI) {
+        onGoHome();
+      }
+      return true;
+    }
+  }
+
+  if (state != BrowserState::BROWSING) {
+    return false;
+  }
+
+  if (event.type == TouchEvent::Type::SwipeUp) {
+    if (entries.empty()) {
+      return true;
+    }
+    selectorIndex = (selectorIndex + static_cast<int>(entries.size()) - 1) % static_cast<int>(entries.size());
+    updateRequired = true;
+    return true;
+  }
+
+  if (event.type == TouchEvent::Type::SwipeDown) {
+    if (entries.empty()) {
+      return true;
+    }
+    selectorIndex = (selectorIndex + 1) % static_cast<int>(entries.size());
+    updateRequired = true;
+    return true;
+  }
+
+  if (event.type != TouchEvent::Type::Tap) {
+    return false;
+  }
+
+  // Rows: startY=60, lineHeight=30, paged by PAGE_ITEMS
+  constexpr int startY = 60;
+  constexpr int lineHeight = 30;
+  const int y = event.end.y;
+  if (y < startY || entries.empty()) {
+    return false;
+  }
+
+  const int row = (y - startY) / lineHeight;
+  if (row < 0 || row >= PAGE_ITEMS) {
+    return false;
+  }
+
+  const int pageStartIndex = selectorIndex / PAGE_ITEMS * PAGE_ITEMS;
+  const int tappedIndex = pageStartIndex + row;
+  if (tappedIndex >= 0 && tappedIndex < static_cast<int>(entries.size())) {
+    selectorIndex = tappedIndex;
+    pendingActivate = true;
+    updateRequired = true;
+    return true;
+  }
+
+  return false;
+}
+#endif
 
 void OpdsBookBrowserActivity::displayTaskLoop() {
   while (true) {

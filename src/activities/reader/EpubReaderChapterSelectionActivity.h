@@ -8,6 +8,10 @@
 
 #include "../Activity.h"
 
+#ifdef USE_M5UNIFIED
+struct TouchEvent;
+#endif
+
 class EpubReaderChapterSelectionActivity final : public Activity {
   std::shared_ptr<Epub> epub;
   TaskHandle_t displayTaskHandle = nullptr;
@@ -15,6 +19,7 @@ class EpubReaderChapterSelectionActivity final : public Activity {
   int currentSpineIndex = 0;
   int selectorIndex = 0;
   bool updateRequired = false;
+  bool pendingActivate = false;
   const std::function<void()> onGoBack;
   const std::function<void(int newSpineIndex)> onSelectSpineIndex;
 
@@ -40,4 +45,8 @@ class EpubReaderChapterSelectionActivity final : public Activity {
   void onExit() override;
   void loop() override;
   void requestRedraw() override;
+
+#ifdef USE_M5UNIFIED
+  bool onTouch(const TouchEvent& event) override;
+#endif
 };

@@ -11,6 +11,10 @@
 #include "OtaUpdateActivity.h"
 #include "fontIds.h"
 
+#ifdef USE_M5UNIFIED
+#include "touch/TouchEvent.h"
+#endif
+
 // Define the static settings list
 namespace {
 constexpr int settingsCount = 20;
@@ -48,6 +52,57 @@ void SettingsActivity::taskTrampoline(void* param) {
   auto* self = static_cast<SettingsActivity*>(param);
   self->displayTaskLoop();
 }
+
+#ifdef USE_M5UNIFIED
+bool SettingsActivity::onTouch(const TouchEvent& event) {
+  if (subActivity) {
+    return subActivity->onTouch(event);
+  }
+
+  if (event.type == TouchEvent::Type::SwipeUp) {
+    selectedSettingIndex = (selectedSettingIndex > 0) ? (selectedSettingIndex - 1) : (settingsCount - 1);
+    updateRequired = true;
+    return true;
+  }
+
+  if (event.type == TouchEvent::Type::SwipeDown) {
+    selectedSettingIndex = (selectedSettingIndex < settingsCount - 1) ? (selectedSettingIndex + 1) : 0;
+    updateRequired = true;
+    return true;
+  }
+
+  if (event.type != TouchEvent::Type::Tap) {
+    return false;
+  }
+
+  const int w = renderer.getScreenWidth();
+  const int h = renderer.getScreenHeight();
+  const int x = event.end.x;
+  const int y = event.end.y;
+
+  // Bottom-left: Save & exit (matches button hint "« Save")
+  if (y > h - 80 && x < w / 3) {
+    SETTINGS.saveToFile();
+    onGoHome();
+    return true;
+  }
+
+  // Settings rows: start at y=60, lineHeight=30 (must match render())
+  constexpr int startY = 60;
+  constexpr int lineHeight = 30;
+  if (y >= startY) {
+    const int idx = (y - startY) / lineHeight;
+    if (idx >= 0 && idx < settingsCount) {
+      selectedSettingIndex = idx;
+      pendingActivate = true;
+      updateRequired = true;
+      return true;
+    }
+  }
+
+  return false;
+}
+#endif
 
 void SettingsActivity::onEnter() {
   Activity::onEnter();
@@ -99,6 +154,15 @@ void SettingsActivity::loop() {
     subActivity->loop();
     return;
   }
+
+#ifdef USE_M5UNIFIED
+  if (pendingActivate) {
+    pendingActivate = false;
+    toggleCurrentSetting();
+    updateRequired = true;
+    return;
+  }
+#endif
 
   // Handle actions with early return
   if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {

@@ -11,6 +11,10 @@
 
 #include "activities/ActivityWithSubactivity.h"
 
+#ifdef USE_M5UNIFIED
+struct TouchEvent;
+#endif
+
 // Structure to hold WiFi network information
 struct WifiNetworkInfo {
   std::string ssid;
@@ -72,6 +76,8 @@ class WifiSelectionActivity final : public ActivityWithSubactivity {
   int savePromptSelection = 0;
   int forgetPromptSelection = 0;
 
+  bool pendingActivate = false;
+
   // Connection timeout
   static constexpr unsigned long CONNECTION_TIMEOUT_MS = 15000;
   unsigned long connectionStartTime = 0;
@@ -102,6 +108,10 @@ class WifiSelectionActivity final : public ActivityWithSubactivity {
   void onExit() override;
   void loop() override;
   void requestRedraw() override;
+
+#ifdef USE_M5UNIFIED
+  bool onTouch(const TouchEvent& event) override;
+#endif
 
   // Get the IP address after successful connection
   const std::string& getConnectedIP() const { return connectedIP; }

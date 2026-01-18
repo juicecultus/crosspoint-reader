@@ -5,6 +5,10 @@
 #include "MappedInputManager.h"
 #include "fontIds.h"
 
+#ifdef USE_M5UNIFIED
+#include "touch/TouchEvent.h"
+#endif
+
 namespace {
 constexpr int SKIP_PAGE_MS = 700;
 }  // namespace
@@ -21,8 +25,77 @@ int XtcReaderChapterSelectionActivity::getPageItems() const {
   if (items < 1) {
     items = 1;
   }
+
   return items;
 }
+
+#ifdef USE_M5UNIFIED
+bool XtcReaderChapterSelectionActivity::onTouch(const TouchEvent& event) {
+  if (!xtc) {
+    return false;
+  }
+
+  if (event.type == TouchEvent::Type::SwipeUp) {
+    const int total = static_cast<int>(xtc->getChapters().size());
+    if (total <= 0) {
+      return true;
+    }
+    selectorIndex = (selectorIndex + total - 1) % total;
+    updateRequired = true;
+    return true;
+  }
+
+  if (event.type == TouchEvent::Type::SwipeDown) {
+    const int total = static_cast<int>(xtc->getChapters().size());
+    if (total <= 0) {
+      return true;
+    }
+    selectorIndex = (selectorIndex + 1) % total;
+    updateRequired = true;
+    return true;
+  }
+
+  if (event.type != TouchEvent::Type::Tap) {
+    return false;
+  }
+
+  const int w = renderer.getScreenWidth();
+  const int h = renderer.getScreenHeight();
+  const int x = event.end.x;
+  const int y = event.end.y;
+
+  // Bottom-left: Back
+  if (y > h - 80 && x < w / 3) {
+    onGoBack();
+    return true;
+  }
+
+  // Rows: startY=60, lineHeight=30
+  constexpr int startY = 60;
+  constexpr int lineHeight = 30;
+  if (y < startY) {
+    return false;
+  }
+
+  const int pageItems = getPageItems();
+  const int row = (y - startY) / lineHeight;
+  if (row < 0 || row >= pageItems) {
+    return false;
+  }
+
+  const int pageStartIndex = selectorIndex / pageItems * pageItems;
+  const int tappedIndex = pageStartIndex + row;
+  const int total = static_cast<int>(xtc->getChapters().size());
+  if (tappedIndex >= 0 && tappedIndex < total) {
+    selectorIndex = tappedIndex;
+    pendingActivate = true;
+    updateRequired = true;
+    return true;
+  }
+
+  return false;
+}
+#endif
 
 int XtcReaderChapterSelectionActivity::findChapterIndexForPage(uint32_t page) const {
   if (!xtc) {
@@ -86,6 +159,17 @@ void XtcReaderChapterSelectionActivity::requestRedraw() {
 }
 
 void XtcReaderChapterSelectionActivity::loop() {
+#ifdef USE_M5UNIFIED
+  if (pendingActivate) {
+    pendingActivate = false;
+    const auto& chapters = xtc->getChapters();
+    if (!chapters.empty() && selectorIndex >= 0 && selectorIndex < static_cast<int>(chapters.size())) {
+      onSelectPage(chapters[selectorIndex].startPage);
+    }
+    return;
+  }
+#endif
+
   const bool prevReleased = mappedInput.wasReleased(MappedInputManager::Button::Up) ||
                             mappedInput.wasReleased(MappedInputManager::Button::Left);
   const bool nextReleased = mappedInput.wasReleased(MappedInputManager::Button::Down) ||
