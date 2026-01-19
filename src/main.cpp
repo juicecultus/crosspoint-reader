@@ -330,6 +330,9 @@ void setup() {
 #ifndef USE_M5UNIFIED
   // Initialize SPI with custom pins
   SPI.begin(EPD_SCLK, SD_SPI_MISO, EPD_MOSI, EPD_CS);
+#else
+  // Initialize SPI with Paper S3 variant pins for SD access (SCK/MISO/MOSI/SS come from the board variant)
+  SPI.begin(SCK, MISO, MOSI, SS);
 #endif
 
   // SD Card Initialization
