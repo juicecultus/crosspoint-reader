@@ -205,7 +205,8 @@ void verifyWakeupLongPress() {
     // Button released too early. Returning to sleep.
     // IMPORTANT: Re-arm the wakeup trigger before sleeping again
  #if defined(CONFIG_IDF_TARGET_ESP32C3)
-    esp_sleep_enable_ext1_wakeup(1ULL << InputManager::POWER_BUTTON_PIN, ESP_EXT1_WAKEUP_ALL_LOW);
+    gpio_wakeup_enable(static_cast<gpio_num_t>(InputManager::POWER_BUTTON_PIN), GPIO_INTR_LOW_LEVEL);
+    esp_sleep_enable_gpio_wakeup();
  #else
     esp_sleep_enable_ext0_wakeup(static_cast<gpio_num_t>(InputManager::POWER_BUTTON_PIN), 0);
  #endif
@@ -235,7 +236,8 @@ void enterDeepSleep() {
   esp_deep_sleep_start();
 #else
  #if defined(CONFIG_IDF_TARGET_ESP32C3)
-  esp_sleep_enable_ext1_wakeup(1ULL << InputManager::POWER_BUTTON_PIN, ESP_EXT1_WAKEUP_ALL_LOW);
+  gpio_wakeup_enable(static_cast<gpio_num_t>(InputManager::POWER_BUTTON_PIN), GPIO_INTR_LOW_LEVEL);
+  esp_sleep_enable_gpio_wakeup();
  #else
   esp_sleep_enable_ext0_wakeup(static_cast<gpio_num_t>(InputManager::POWER_BUTTON_PIN), 0);
  #endif
