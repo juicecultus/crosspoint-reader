@@ -7,6 +7,10 @@
 
 #include "activities/ActivityWithSubactivity.h"
 
+#ifdef USE_M5UNIFIED
+struct TouchEvent;
+#endif
+
 /**
  * Activity for testing KOReader credentials.
  * Connects to WiFi and authenticates with the KOReader sync server.
@@ -21,6 +25,10 @@ class KOReaderAuthActivity final : public ActivityWithSubactivity {
   void onExit() override;
   void loop() override;
   bool preventAutoSleep() override { return state == CONNECTING || state == AUTHENTICATING; }
+
+#ifdef USE_M5UNIFIED
+  bool onTouch(const TouchEvent& event) override;
+#endif
 
  private:
   enum State { WIFI_SELECTION, CONNECTING, AUTHENTICATING, SUCCESS, FAILED };

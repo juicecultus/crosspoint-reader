@@ -11,6 +11,10 @@
 #include "ProgressMapper.h"
 #include "activities/ActivityWithSubactivity.h"
 
+#ifdef USE_M5UNIFIED
+struct TouchEvent;
+#endif
+
 /**
  * Activity for syncing reading progress with KOReader sync server.
  *
@@ -46,6 +50,10 @@ class KOReaderSyncActivity final : public ActivityWithSubactivity {
   void onExit() override;
   void loop() override;
   bool preventAutoSleep() override { return state == CONNECTING || state == SYNCING; }
+
+#ifdef USE_M5UNIFIED
+  bool onTouch(const TouchEvent& event) override;
+#endif
 
  private:
   enum State {

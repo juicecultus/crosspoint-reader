@@ -7,6 +7,10 @@
 
 #include "activities/ActivityWithSubactivity.h"
 
+#ifdef USE_M5UNIFIED
+struct TouchEvent;
+#endif
+
 /**
  * Submenu for KOReader Sync settings.
  * Shows username, password, and authenticate options.
@@ -20,6 +24,10 @@ class KOReaderSettingsActivity final : public ActivityWithSubactivity {
   void onEnter() override;
   void onExit() override;
   void loop() override;
+
+#ifdef USE_M5UNIFIED
+  bool onTouch(const TouchEvent& event) override;
+#endif
 
  private:
   TaskHandle_t displayTaskHandle = nullptr;

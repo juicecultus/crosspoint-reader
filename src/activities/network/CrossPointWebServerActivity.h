@@ -9,6 +9,10 @@
 
 #include "NetworkModeSelectionActivity.h"
 #include "activities/ActivityWithSubactivity.h"
+
+#ifdef USE_M5UNIFIED
+struct TouchEvent;
+#endif
 #include "network/CrossPointWebServer.h"
 
 // Web server activity states
@@ -71,4 +75,8 @@ class CrossPointWebServerActivity final : public ActivityWithSubactivity {
   void loop() override;
   bool skipLoopDelay() override { return webServer && webServer->isRunning(); }
   bool preventAutoSleep() override { return webServer && webServer->isRunning(); }
+
+#ifdef USE_M5UNIFIED
+  bool onTouch(const TouchEvent& event) override;
+#endif
 };

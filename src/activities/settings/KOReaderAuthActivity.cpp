@@ -3,11 +3,32 @@
 #include <GfxRenderer.h>
 #include <WiFi.h>
 
+#ifdef USE_M5UNIFIED
+#include "touch/TouchEvent.h"
+#endif
+
 #include "KOReaderCredentialStore.h"
 #include "KOReaderSyncClient.h"
 #include "MappedInputManager.h"
 #include "activities/network/WifiSelectionActivity.h"
 #include "fontIds.h"
+
+#ifdef USE_M5UNIFIED
+bool KOReaderAuthActivity::onTouch(const TouchEvent& event) {
+  if (subActivity) {
+    return subActivity->onTouch(event);
+  }
+
+  if (state == SUCCESS || state == FAILED) {
+    if (event.type == TouchEvent::Type::Tap || event.type == TouchEvent::Type::SwipeRight) {
+      onComplete();
+      return true;
+    }
+  }
+
+  return false;
+}
+#endif
 
 void KOReaderAuthActivity::taskTrampoline(void* param) {
   auto* self = static_cast<KOReaderAuthActivity*>(param);

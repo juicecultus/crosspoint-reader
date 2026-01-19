@@ -4,6 +4,10 @@
 #include <WiFi.h>
 #include <esp_sntp.h>
 
+#ifdef USE_M5UNIFIED
+#include "touch/TouchEvent.h"
+#endif
+
 #include "KOReaderCredentialStore.h"
 #include "KOReaderDocumentId.h"
 #include "MappedInputManager.h"
@@ -37,6 +41,69 @@ void syncTimeWithNTP() {
   }
 }
 }  // namespace
+
+#ifdef USE_M5UNIFIED
+bool KOReaderSyncActivity::onTouch(const TouchEvent& event) {
+  if (subActivity) {
+    return subActivity->onTouch(event);
+  }
+
+  // Swipe right to cancel/go back in any dismissable state
+  if (event.type == TouchEvent::Type::SwipeRight) {
+    if (state == NO_CREDENTIALS || state == SYNC_FAILED || state == UPLOAD_COMPLETE ||
+        state == SHOWING_RESULT || state == NO_REMOTE_PROGRESS) {
+      onCancel();
+      return true;
+    }
+  }
+
+  if (state == SHOWING_RESULT) {
+    if (event.type == TouchEvent::Type::SwipeUp) {
+      selectedOption = (selectedOption + 2) % 3;
+      updateRequired = true;
+      return true;
+    }
+    if (event.type == TouchEvent::Type::SwipeDown) {
+      selectedOption = (selectedOption + 1) % 3;
+      updateRequired = true;
+      return true;
+    }
+    if (event.type == TouchEvent::Type::Tap) {
+      if (selectedOption == 0) {
+        onSyncComplete(remotePosition.spineIndex, remotePosition.pageNumber);
+      } else if (selectedOption == 1) {
+        performUpload();
+      } else {
+        onCancel();
+      }
+      return true;
+    }
+  }
+
+  if (state == NO_REMOTE_PROGRESS) {
+    if (event.type == TouchEvent::Type::Tap) {
+      if (documentHash.empty()) {
+        if (KOREADER_STORE.getMatchMethod() == DocumentMatchMethod::FILENAME) {
+          documentHash = KOReaderDocumentId::calculateFromFilename(epubPath);
+        } else {
+          documentHash = KOReaderDocumentId::calculate(epubPath);
+        }
+      }
+      performUpload();
+      return true;
+    }
+  }
+
+  if (state == NO_CREDENTIALS || state == SYNC_FAILED || state == UPLOAD_COMPLETE) {
+    if (event.type == TouchEvent::Type::Tap) {
+      onCancel();
+      return true;
+    }
+  }
+
+  return false;
+}
+#endif
 
 void KOReaderSyncActivity::taskTrampoline(void* param) {
   auto* self = static_cast<KOReaderSyncActivity*>(param);

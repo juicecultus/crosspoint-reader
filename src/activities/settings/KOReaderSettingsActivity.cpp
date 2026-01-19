@@ -4,6 +4,10 @@
 
 #include <cstring>
 
+#ifdef USE_M5UNIFIED
+#include "touch/TouchEvent.h"
+#endif
+
 #include "KOReaderAuthActivity.h"
 #include "KOReaderCredentialStore.h"
 #include "MappedInputManager.h"
@@ -12,8 +16,53 @@
 
 namespace {
 constexpr int MENU_ITEMS = 5;
+constexpr int ROW_HEIGHT = 30;
+constexpr int FIRST_ROW_Y = 60;
 const char* menuNames[MENU_ITEMS] = {"Username", "Password", "Sync Server URL", "Document Matching", "Authenticate"};
 }  // namespace
+
+#ifdef USE_M5UNIFIED
+bool KOReaderSettingsActivity::onTouch(const TouchEvent& event) {
+  if (subActivity) {
+    return subActivity->onTouch(event);
+  }
+
+  if (event.type == TouchEvent::Type::SwipeUp) {
+    selectedIndex = (selectedIndex + MENU_ITEMS - 1) % MENU_ITEMS;
+    updateRequired = true;
+    return true;
+  }
+
+  if (event.type == TouchEvent::Type::SwipeDown) {
+    selectedIndex = (selectedIndex + 1) % MENU_ITEMS;
+    updateRequired = true;
+    return true;
+  }
+
+  if (event.type == TouchEvent::Type::SwipeRight) {
+    onBack();
+    return true;
+  }
+
+  if (event.type != TouchEvent::Type::Tap) {
+    return false;
+  }
+
+  const int y = event.end.y;
+  if (y >= FIRST_ROW_Y && y < FIRST_ROW_Y + MENU_ITEMS * ROW_HEIGHT) {
+    const int tappedIndex = (y - FIRST_ROW_Y) / ROW_HEIGHT;
+    if (tappedIndex == selectedIndex) {
+      handleSelection();
+    } else {
+      selectedIndex = tappedIndex;
+      updateRequired = true;
+    }
+    return true;
+  }
+
+  return false;
+}
+#endif
 
 void KOReaderSettingsActivity::taskTrampoline(void* param) {
   auto* self = static_cast<KOReaderSettingsActivity*>(param);

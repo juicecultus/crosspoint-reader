@@ -9,6 +9,10 @@
 
 #include <cstddef>
 
+#ifdef USE_M5UNIFIED
+#include "touch/TouchEvent.h"
+#endif
+
 #include "MappedInputManager.h"
 #include "NetworkModeSelectionActivity.h"
 #include "WifiSelectionActivity.h"
@@ -26,6 +30,24 @@ constexpr uint8_t AP_MAX_CONNECTIONS = 4;
 DNSServer* dnsServer = nullptr;
 constexpr uint16_t DNS_PORT = 53;
 }  // namespace
+
+#ifdef USE_M5UNIFIED
+bool CrossPointWebServerActivity::onTouch(const TouchEvent& event) {
+  if (subActivity) {
+    return subActivity->onTouch(event);
+  }
+
+  // When server is running, swipe right to exit
+  if (state == WebServerActivityState::SERVER_RUNNING) {
+    if (event.type == TouchEvent::Type::SwipeRight) {
+      onGoBack();
+      return true;
+    }
+  }
+
+  return false;
+}
+#endif
 
 void CrossPointWebServerActivity::taskTrampoline(void* param) {
   auto* self = static_cast<CrossPointWebServerActivity*>(param);

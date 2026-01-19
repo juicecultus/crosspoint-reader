@@ -7,6 +7,10 @@
 
 #include <cstring>
 
+#ifdef USE_M5UNIFIED
+#include "touch/TouchEvent.h"
+#endif
+
 #include "MappedInputManager.h"
 #include "ScreenComponents.h"
 #include "fontIds.h"
@@ -16,6 +20,17 @@ namespace {
 constexpr uint16_t UDP_PORTS[] = {54982, 48123, 39001, 44044, 59678};
 constexpr uint16_t LOCAL_UDP_PORT = 8134;  // Port to receive responses
 }  // namespace
+
+#ifdef USE_M5UNIFIED
+bool CalibreWirelessActivity::onTouch(const TouchEvent& event) {
+  // Swipe right to exit/cancel
+  if (event.type == TouchEvent::Type::SwipeRight) {
+    onComplete();
+    return true;
+  }
+  return false;
+}
+#endif
 
 void CalibreWirelessActivity::displayTaskTrampoline(void* param) {
   auto* self = static_cast<CalibreWirelessActivity*>(param);

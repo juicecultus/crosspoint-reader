@@ -11,6 +11,10 @@
 
 #include "activities/Activity.h"
 
+#ifdef USE_M5UNIFIED
+struct TouchEvent;
+#endif
+
 /**
  * CalibreWirelessActivity implements Calibre's "wireless device" protocol.
  * This allows Calibre desktop to send books directly to the device over WiFi.
@@ -132,4 +136,8 @@ class CalibreWirelessActivity final : public Activity {
   void loop() override;
   bool preventAutoSleep() override { return true; }
   bool skipLoopDelay() override { return true; }
+
+#ifdef USE_M5UNIFIED
+  bool onTouch(const TouchEvent& event) override;
+#endif
 };
