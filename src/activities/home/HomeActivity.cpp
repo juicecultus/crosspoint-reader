@@ -333,15 +333,8 @@ void HomeActivity::requestRedraw() {
 
 void HomeActivity::displayTaskLoop() {
   while (true) {
-#ifdef USE_M5UNIFIED
-    if (M5.Rtc.isEnabled()) {
-      const auto rtcTime = M5.Rtc.getTime();
-      if (rtcTime.minutes != lastRenderedMinute) {
-        lastRenderedMinute = rtcTime.minutes;
-        updateRequired = true;
-      }
-    }
-#endif
+    // Note: RTC minute updates disabled to avoid unnecessary e-ink refreshes
+    // Time is shown on initial render and updates when returning to Home screen
 
     if (updateRequired) {
       updateRequired = false;
