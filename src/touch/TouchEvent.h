@@ -10,6 +10,7 @@ struct TouchPoint {
 struct TouchEvent {
   enum class Type {
     Tap,
+    TwoFingerTap,
     LongPress,
     SwipeLeft,
     SwipeRight,

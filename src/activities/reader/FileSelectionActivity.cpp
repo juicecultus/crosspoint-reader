@@ -30,6 +30,27 @@ void sortFileList(std::vector<std::string>& strs) {
 
 #ifdef USE_M5UNIFIED
 bool FileSelectionActivity::onTouch(const TouchEvent& event) {
+  // Two-finger tap: go up one directory (or home if at root)
+  if (event.type == TouchEvent::Type::TwoFingerTap) {
+    if (basepath != "/") {
+      const std::string oldPath = basepath;
+      basepath.replace(basepath.find_last_of('/'), std::string::npos, "");
+      if (basepath.empty()) {
+        basepath = "/";
+      }
+      loadFiles();
+
+      const auto pos = oldPath.find_last_of('/');
+      const std::string dirName = oldPath.substr(pos + 1) + "/";
+      selectorIndex = findEntry(dirName);
+
+      updateRequired = true;
+    } else {
+      onGoHome();
+    }
+    return true;
+  }
+
   if (event.type == TouchEvent::Type::SwipeUp) {
     if (files.empty()) {
       return true;
@@ -56,33 +77,9 @@ bool FileSelectionActivity::onTouch(const TouchEvent& event) {
     return false;
   }
 
-  const int w = renderer.getScreenWidth();
-  const int h = renderer.getScreenHeight();
-  const int x = event.end.x;
   const int y = event.end.y;
 
-  // Bottom-left: go up one directory (or home if at root)
-  if (y > h - 80 && x < w / 3) {
-    if (basepath != "/") {
-      const std::string oldPath = basepath;
-      basepath.replace(basepath.find_last_of('/'), std::string::npos, "");
-      if (basepath.empty()) {
-        basepath = "/";
-      }
-      loadFiles();
-
-      const auto pos = oldPath.find_last_of('/');
-      const std::string dirName = oldPath.substr(pos + 1) + "/";
-      selectorIndex = findEntry(dirName);
-
-      updateRequired = true;
-    } else {
-      onGoHome();
-    }
-    return true;
-  }
-
-  // Rows: start at START_Y, LINE_HEIGHT pixels each
+  // Single-finger tap on row: select item
   if (y >= START_Y && !files.empty()) {
     const int pageItems = getPageItems();
     const int row = (y - START_Y) / LINE_HEIGHT;

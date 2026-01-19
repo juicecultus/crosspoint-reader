@@ -57,6 +57,12 @@ int EpubReaderChapterSelectionActivity::getPageItems() const {
 
 #ifdef USE_M5UNIFIED
 bool EpubReaderChapterSelectionActivity::onTouch(const TouchEvent& event) {
+  // Two-finger tap: go back
+  if (event.type == TouchEvent::Type::TwoFingerTap) {
+    onGoBack();
+    return true;
+  }
+
   if (event.type == TouchEvent::Type::SwipeUp) {
     const int total = epub ? epub->getTocItemsCount() : 0;
     if (total <= 0) {
@@ -83,18 +89,9 @@ bool EpubReaderChapterSelectionActivity::onTouch(const TouchEvent& event) {
     return false;
   }
 
-  const int w = renderer.getScreenWidth();
-  const int h = renderer.getScreenHeight();
-  const int x = event.end.x;
   const int y = event.end.y;
 
-  // Bottom-left: Back
-  if (y > h - 80 && x < w / 3) {
-    onGoBack();
-    return true;
-  }
-
-  // Rows: startY=60, lineHeight=30
+  // Single-finger tap on row: select item
   constexpr int startY = 60;
   constexpr int lineHeight = 60;
   if (!epub || y < startY) {

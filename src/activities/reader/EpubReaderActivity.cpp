@@ -76,13 +76,14 @@ bool EpubReaderActivity::onTouch(const TouchEvent& event) {
   const int w = renderer.getScreenWidth();
   const int h = renderer.getScreenHeight();
   const int x = event.end.x;
-  const int y = event.end.y;
-  const bool inCenter = (x >= w / 3 && x <= (w * 2) / 3 && y >= h / 3 && y <= (h * 2) / 3);
+
+  // Two-finger tap: go home
+  if (event.type == TouchEvent::Type::TwoFingerTap) {
+    onGoHome();
+    return true;
+  }
 
   if (event.type == TouchEvent::Type::LongPress) {
-    if (!inCenter) {
-      return false;
-    }
     chromeVisible = !chromeVisible;
     chromeSelectionIndex = 0;
     updateRequired = true;
@@ -187,7 +188,9 @@ bool EpubReaderActivity::onTouch(const TouchEvent& event) {
     return false;
   }
 
-  if (inCenter) {
+  // 3-zone layout: LEFT (prev page), CENTER (open TOC), RIGHT (next page)
+  if (x >= w / 3 && x <= (w * 2) / 3) {
+    // Center tap: open chapter selection
     pendingOpenChapterSelection = true;
     return true;
   }

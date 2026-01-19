@@ -27,6 +27,12 @@ bool KOReaderSettingsActivity::onTouch(const TouchEvent& event) {
     return subActivity->onTouch(event);
   }
 
+  // Two-finger tap: go back
+  if (event.type == TouchEvent::Type::TwoFingerTap) {
+    onBack();
+    return true;
+  }
+
   if (event.type == TouchEvent::Type::SwipeUp) {
     selectedIndex = (selectedIndex + MENU_ITEMS - 1) % MENU_ITEMS;
     updateRequired = true;
@@ -39,15 +45,11 @@ bool KOReaderSettingsActivity::onTouch(const TouchEvent& event) {
     return true;
   }
 
-  if (event.type == TouchEvent::Type::SwipeRight) {
-    onBack();
-    return true;
-  }
-
   if (event.type != TouchEvent::Type::Tap) {
     return false;
   }
 
+  // Single-finger tap on row: select item
   const int y = event.end.y;
   if (y >= START_Y && y < START_Y + MENU_ITEMS * LINE_HEIGHT) {
     const int tappedIndex = (y - START_Y) / LINE_HEIGHT;

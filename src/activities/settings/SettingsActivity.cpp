@@ -82,6 +82,12 @@ bool SettingsActivity::onTouch(const TouchEvent& event) {
     return subActivity->onTouch(event);
   }
 
+  // Two-finger tap: go back
+  if (event.type == TouchEvent::Type::TwoFingerTap) {
+    onGoHome();
+    return true;
+  }
+
   if (event.type == TouchEvent::Type::SwipeUp) {
     const int pageItems = getSettingsPageItems(renderer);
     selectedSettingIndex = (selectedSettingIndex + settingsCount - pageItems) % settingsCount;
@@ -100,18 +106,9 @@ bool SettingsActivity::onTouch(const TouchEvent& event) {
     return false;
   }
 
-  const int w = renderer.getScreenWidth();
-  const int h = renderer.getScreenHeight();
-  const int x = event.end.x;
   const int y = event.end.y;
 
-  // Bottom-left: Back
-  if (y > h - 80 && x < w / 3) {
-    onGoHome();
-    return true;
-  }
-
-  // Settings rows: start at y=60, lineHeight=30 (must match render())
+  // Single-finger tap on row: select setting
   constexpr int startY = 60;
   constexpr int lineHeight = 60;
   if (y >= startY) {

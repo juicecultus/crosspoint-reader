@@ -19,6 +19,7 @@ class TouchManager {
   TouchPoint start{0, 0};
   uint32_t startMs = 0;
   uint32_t ignoreUntilMs = 0;
+  uint8_t maxFingers = 1;
 };
 
 #endif

@@ -26,24 +26,17 @@ bool WifiSelectionActivity::onTouch(const TouchEvent& event) {
     return subActivity->onTouch(event);
   }
 
-  if (event.type == TouchEvent::Type::Tap) {
-    const int w = renderer.getScreenWidth();
-    const int h = renderer.getScreenHeight();
-    const int x = event.end.x;
-    const int y = event.end.y;
-
-    // Bottom-left: cancel/back
-    if (y > h - 80 && x < w / 3) {
-      if (state == WifiSelectionState::NETWORK_LIST) {
-        onComplete(false);
-      } else if (state == WifiSelectionState::SAVE_PROMPT) {
-        onComplete(true);
-      } else if (state == WifiSelectionState::FORGET_PROMPT || state == WifiSelectionState::CONNECTION_FAILED) {
-        state = WifiSelectionState::NETWORK_LIST;
-        updateRequired = true;
-      }
-      return true;
+  // Two-finger tap: cancel/back
+  if (event.type == TouchEvent::Type::TwoFingerTap) {
+    if (state == WifiSelectionState::NETWORK_LIST) {
+      onComplete(false);
+    } else if (state == WifiSelectionState::SAVE_PROMPT) {
+      onComplete(true);
+    } else if (state == WifiSelectionState::FORGET_PROMPT || state == WifiSelectionState::CONNECTION_FAILED) {
+      state = WifiSelectionState::NETWORK_LIST;
+      updateRequired = true;
     }
+    return true;
   }
 
   if (state == WifiSelectionState::NETWORK_LIST) {

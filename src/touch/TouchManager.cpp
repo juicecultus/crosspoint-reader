@@ -27,14 +27,17 @@ std::optional<TouchEvent> TouchManager::poll() {
   }
 
   M5.update();
+  
+  // Check touch count for multi-finger detection
+  const uint8_t touchCount = M5.Touch.getCount();
   auto t = M5.Touch.getDetail();
 
   // Debug: log touch state periodically
   static uint32_t lastDebug = 0;
   if (t.isPressed() && now - lastDebug > 500) {
     lastDebug = now;
-    Serial.printf("[%lu] [TCH] Touch: x=%d y=%d pressed=%d holding=%d released=%d\n", 
-                  now, t.x, t.y, t.isPressed(), t.isHolding(), t.isReleased());
+    Serial.printf("[%lu] [TCH] Touch: x=%d y=%d pressed=%d holding=%d released=%d count=%d\n", 
+                  now, t.x, t.y, t.isPressed(), t.isHolding(), t.isReleased(), touchCount);
   }
 
   const bool down = t.isPressed() || t.isHolding();
@@ -43,11 +46,17 @@ std::optional<TouchEvent> TouchManager::poll() {
     tracking = true;
     start = {static_cast<int16_t>(t.x), static_cast<int16_t>(t.y)};
     startMs = now;
+    maxFingers = touchCount;
     return std::nullopt;
   }
 
   if (!tracking) {
     return std::nullopt;
+  }
+
+  // Track maximum finger count during this gesture
+  if (touchCount > maxFingers) {
+    maxFingers = touchCount;
   }
 
   if (down) {
@@ -61,6 +70,8 @@ std::optional<TouchEvent> TouchManager::poll() {
   tracking = false;
   const TouchPoint end{static_cast<int16_t>(t.x), static_cast<int16_t>(t.y)};
   const uint32_t dur = now - startMs;
+  const uint8_t fingers = maxFingers;
+  maxFingers = 1;
 
   const int dx = end.x - start.x;
   const int dy = end.y - start.y;
@@ -72,6 +83,10 @@ std::optional<TouchEvent> TouchManager::poll() {
       return TouchEvent{TouchEvent::Type::LongPress, start, end, dur};
     }
     if (dur <= TAP_MAX_MS) {
+      // Two-finger tap for back navigation
+      if (fingers >= 2) {
+        return TouchEvent{TouchEvent::Type::TwoFingerTap, start, end, dur};
+      }
       return TouchEvent{TouchEvent::Type::Tap, start, end, dur};
     }
     return std::nullopt;

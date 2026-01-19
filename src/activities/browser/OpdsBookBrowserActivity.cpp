@@ -203,21 +203,14 @@ bool OpdsBookBrowserActivity::onTouch(const TouchEvent& event) {
     return ActivityWithSubactivity::onTouch(event);
   }
 
-  if (event.type == TouchEvent::Type::Tap) {
-    const int w = renderer.getScreenWidth();
-    const int h = renderer.getScreenHeight();
-    const int x = event.end.x;
-    const int y = event.end.y;
-
-    // Bottom-left: Back
-    if (y > h - 80 && x < w / 3) {
-      if (state == BrowserState::BROWSING || state == BrowserState::ERROR || state == BrowserState::LOADING) {
-        navigateBack();
-      } else if (state == BrowserState::CHECK_WIFI) {
-        onGoHome();
-      }
-      return true;
+  // Two-finger tap: go back
+  if (event.type == TouchEvent::Type::TwoFingerTap) {
+    if (state == BrowserState::BROWSING || state == BrowserState::ERROR || state == BrowserState::LOADING) {
+      navigateBack();
+    } else if (state == BrowserState::CHECK_WIFI) {
+      onGoHome();
     }
+    return true;
   }
 
   if (state != BrowserState::BROWSING) {
@@ -252,6 +245,7 @@ bool OpdsBookBrowserActivity::onTouch(const TouchEvent& event) {
     return false;
   }
 
+  // Single-finger tap on row: select entry
   const int pageItems = getPageItems(renderer);
   const int y = event.end.y;
   if (y < START_Y || entries.empty()) {

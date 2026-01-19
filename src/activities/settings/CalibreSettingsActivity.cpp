@@ -29,6 +29,12 @@ bool CalibreSettingsActivity::onTouch(const TouchEvent& event) {
     return subActivity->onTouch(event);
   }
 
+  // Two-finger tap: go back
+  if (event.type == TouchEvent::Type::TwoFingerTap) {
+    onBack();
+    return true;
+  }
+
   if (event.type == TouchEvent::Type::SwipeUp) {
     const int step = MENU_ITEMS;
     selectedIndex = (selectedIndex + MENU_ITEMS - step) % MENU_ITEMS;
@@ -47,18 +53,8 @@ bool CalibreSettingsActivity::onTouch(const TouchEvent& event) {
     return false;
   }
 
-  const int w = renderer.getScreenWidth();
-  const int h = renderer.getScreenHeight();
-  const int x = event.end.x;
+  // Single-finger tap on row: select item
   const int y = event.end.y;
-
-  // Bottom-left: Back
-  if (y > h - 80 && x < w / 3) {
-    onBack();
-    return true;
-  }
-
-  // Menu rows
   if (y >= START_Y) {
     const int idx = (y - START_Y) / LINE_HEIGHT;
     if (idx >= 0 && idx < MENU_ITEMS) {
