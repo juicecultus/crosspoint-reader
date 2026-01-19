@@ -38,8 +38,8 @@ void KeyboardEntryActivity::onEnter() {
   // Trigger first update
   updateRequired = true;
 
-  xTaskCreate(&KeyboardEntryActivity::taskTrampoline, "KeyboardEntryActivity",
-              2048,               // Stack size
+  xTaskCreate(&KeyboardEntryActivity::taskTrampoline, "KeyboardEntryAc",
+              8192,               // Stack size - generous for M5 Paper S3 with 8MB PSRAM
               this,               // Parameters
               1,                  // Priority
               &displayTaskHandle  // Task handle
