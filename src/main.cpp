@@ -315,6 +315,14 @@ void setup() {
 
 #ifdef USE_M5UNIFIED
   Serial.begin(115200);
+
+  auto cfg = M5.config();
+  cfg.serial_baudrate = 115200;
+  cfg.clear_display = true;
+  cfg.output_power = true;
+  cfg.internal_imu = true;
+  cfg.internal_rtc = true;
+  M5.begin(cfg);
 #else
   // Only start serial if USB connected
   pinMode(UART0_RXD, INPUT);
