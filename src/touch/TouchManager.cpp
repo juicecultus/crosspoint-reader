@@ -34,10 +34,17 @@ std::optional<TouchEvent> TouchManager::poll() {
 
   // Debug: log touch state periodically
   static uint32_t lastDebug = 0;
+  static uint32_t lastAnyLog = 0;
   if (t.isPressed() && now - lastDebug > 500) {
     lastDebug = now;
+    lastAnyLog = now;
     Serial.printf("[%lu] [TCH] Touch: x=%d y=%d pressed=%d holding=%d released=%d count=%d\n", 
                   now, t.x, t.y, t.isPressed(), t.isHolding(), t.isReleased(), touchCount);
+  }
+  // Log heartbeat every 30 seconds to confirm touch polling is still running
+  if (now - lastAnyLog > 30000) {
+    lastAnyLog = now;
+    Serial.printf("[%lu] [TCH] Heartbeat: polling active, tracking=%d\n", now, tracking);
   }
 
   const bool down = t.isPressed() || t.isHolding();
