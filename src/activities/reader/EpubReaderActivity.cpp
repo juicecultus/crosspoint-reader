@@ -395,6 +395,7 @@ void EpubReaderActivity::loop() {
           exitActivity();
           updateRequired = true;
         }));
+    xSemaphoreGive(renderingMutex);
     return;
   }
 

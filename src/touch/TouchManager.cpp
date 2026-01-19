@@ -71,9 +71,17 @@ std::optional<TouchEvent> TouchManager::poll() {
   }
 
   if (!t.isReleased()) {
+    // Debug: log when we're waiting for release
+    static uint32_t lastWaitLog = 0;
+    if (tracking && now - lastWaitLog > 1000) {
+      lastWaitLog = now;
+      Serial.printf("[%lu] [TCH] Waiting for release, tracking=%d\n", now, tracking);
+    }
     return std::nullopt;
   }
 
+  Serial.printf("[%lu] [TCH] Released: start=(%d,%d) end=(%d,%d) fingers=%d\n", 
+                now, start.x, start.y, t.x, t.y, maxFingers);
   tracking = false;
   const TouchPoint end{static_cast<int16_t>(t.x), static_cast<int16_t>(t.y)};
   const uint32_t dur = now - startMs;

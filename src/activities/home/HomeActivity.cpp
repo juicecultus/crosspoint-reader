@@ -61,7 +61,7 @@ bool HomeActivity::onTouch(const TouchEvent& event) {
 
   // Book card bounds (must match render())
   const int bookWidth = w / 2;
-  const int bookHeight = h * 2 / 3;  // Increased by 1/3
+  const int bookHeight = h / 2;
   const int bookX = (w - bookWidth) / 2;
   constexpr int bookY = 30;
 
@@ -372,7 +372,7 @@ void HomeActivity::render() {
 
   // --- Top "book" card for the current title (selectorIndex == 0) ---
   const int bookWidth = pageWidth / 2;
-  const int bookHeight = pageHeight * 2 / 3;  // Increased by 1/3
+  const int bookHeight = pageHeight / 2;
   const int bookX = (pageWidth - bookWidth) / 2;
   constexpr int bookY = 30;
   const bool bookSelected = hasContinueReading && selectorIndex == 0;

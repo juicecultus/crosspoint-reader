@@ -23,6 +23,12 @@ void NetworkModeSelectionActivity::taskTrampoline(void* param) {
 
 #ifdef USE_M5UNIFIED
 bool NetworkModeSelectionActivity::onTouch(const TouchEvent& event) {
+  // Two-finger tap: go back
+  if (event.type == TouchEvent::Type::TwoFingerTap) {
+    onCancel();
+    return true;
+  }
+
   if (event.type == TouchEvent::Type::SwipeUp) {
     const int step = MENU_ITEM_COUNT;
     selectedIndex = (selectedIndex + MENU_ITEM_COUNT - step) % MENU_ITEM_COUNT;
@@ -41,19 +47,11 @@ bool NetworkModeSelectionActivity::onTouch(const TouchEvent& event) {
     return false;
   }
 
-  const int w = renderer.getScreenWidth();
   const int h = renderer.getScreenHeight();
-  const int x = event.end.x;
   const int y = event.end.y;
 
-  // Bottom-left: Back
-  if (y > h - 80 && x < w / 3) {
-    onCancel();
-    return true;
-  }
-
   // Tap one of the two options
-  constexpr int itemHeight = 50;
+  constexpr int itemHeight = 100;
   const int startY = (h - (MENU_ITEM_COUNT * itemHeight)) / 2 + 10;
   for (int i = 0; i < MENU_ITEM_COUNT; i++) {
     const int itemY = startY + i * itemHeight;
@@ -168,7 +166,7 @@ void NetworkModeSelectionActivity::render() const {
   renderer.drawCenteredText(UI_10_FONT_ID, 50, "How would you like to connect?");
 
   // Draw menu items centered on screen
-  constexpr int itemHeight = 50;  // Height for each menu item (including description)
+  constexpr int itemHeight = 100;  // Height for each menu item (doubled)
   const int startY = (pageHeight - (MENU_ITEM_COUNT * itemHeight)) / 2 + 10;
 
   for (int i = 0; i < MENU_ITEM_COUNT; i++) {
@@ -180,15 +178,14 @@ void NetworkModeSelectionActivity::render() const {
       renderer.fillRect(20, itemY - 2, pageWidth - 40, itemHeight - 6);
     }
 
-    // Draw text: black=false (white text) when selected (on black background)
-    //            black=true (black text) when not selected (on white background)
-    renderer.drawText(UI_10_FONT_ID, 30, itemY, MENU_ITEMS[i], /*black=*/!isSelected);
-    renderer.drawText(SMALL_FONT_ID, 30, itemY + 22, MENU_DESCRIPTIONS[i], /*black=*/!isSelected);
+    // Center text vertically within the button (itemHeight - 6 = 94px usable height)
+    // Title font ~20px, description font ~16px, spacing ~8px = ~44px total text height
+    // Offset from top: (94 - 44) / 2 = 25px
+    const int textOffsetY = 25;
+    renderer.drawText(UI_10_FONT_ID, 30, itemY + textOffsetY, MENU_ITEMS[i], /*black=*/!isSelected);
+    renderer.drawText(SMALL_FONT_ID, 30, itemY + textOffsetY + 28, MENU_DESCRIPTIONS[i], /*black=*/!isSelected);
   }
 
-  // Draw help text at bottom
-  const auto labels = mappedInput.mapLabels("« Back", "Select", "", "");
-  renderer.drawButtonHints(UI_10_FONT_ID, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
 
   renderer.displayBuffer();
 }
