@@ -26,16 +26,30 @@ jobs:
       - name: Install PlatformIO Core
         run: pip install --upgrade platformio
 
-      - name: Build CrossPoint
+      - name: Build CrossPoint (Xteink X4)
         run: pio run -e gh_release
 
-      - name: Upload Artifacts
+      - name: Upload Artifacts (Xteink X4)
         uses: actions/upload-artifact@v4
         with:
-          name: CrossPoint-${{ github.ref_name }}
+          name: CrossPoint-XteinkX4-${{ github.ref_name }}
           path: |
             .pio/build/gh_release/bootloader.bin
             .pio/build/gh_release/firmware.bin
             .pio/build/gh_release/firmware.elf
             .pio/build/gh_release/firmware.map
             .pio/build/gh_release/partitions.bin
+
+      - name: Build CrossPoint (M5 Paper S3)
+        run: pio run -e m5stack-paper-s3
+
+      - name: Upload Artifacts (M5 Paper S3)
+        uses: actions/upload-artifact@v4
+        with:
+          name: CrossPoint-M5PaperS3-${{ github.ref_name }}
+          path: |
+            .pio/build/m5stack-paper-s3/bootloader.bin
+            .pio/build/m5stack-paper-s3/firmware.bin
+            .pio/build/m5stack-paper-s3/firmware.elf
+            .pio/build/m5stack-paper-s3/firmware.map
+            .pio/build/m5stack-paper-s3/partitions.bin
