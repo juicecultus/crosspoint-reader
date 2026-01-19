@@ -29,6 +29,14 @@ std::optional<TouchEvent> TouchManager::poll() {
   M5.update();
   auto t = M5.Touch.getDetail();
 
+  // Debug: log touch state periodically
+  static uint32_t lastDebug = 0;
+  if (t.isPressed() && now - lastDebug > 500) {
+    lastDebug = now;
+    Serial.printf("[%lu] [TCH] Touch: x=%d y=%d pressed=%d holding=%d released=%d\n", 
+                  now, t.x, t.y, t.isPressed(), t.isHolding(), t.isReleased());
+  }
+
   const bool down = t.isPressed() || t.isHolding();
 
   if (!tracking && down) {
