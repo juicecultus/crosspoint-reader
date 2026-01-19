@@ -34,14 +34,46 @@ jobs:
       - name: Build CrossPoint (Xteink X4)
         run: pio run -e gh_release
 
+      - name: Debug build outputs (Xteink X4)
+        run: |
+          echo "== .pio/build =="
+          ls -la .pio/build || true
+          echo "== .pio/build/gh_release =="
+          ls -la .pio/build/gh_release || true
+
       - name: Build CrossPoint (M5 Paper S3)
         run: pio run -e m5stack-paper-s3
+
+      - name: Debug build outputs (M5 Paper S3)
+        run: |
+          echo "== .pio/build/m5stack-paper-s3 =="
+          ls -la .pio/build/m5stack-paper-s3 || true
 
       - name: Prepare artifacts
         run: |
           mkdir -p dist
-          cp .pio/build/gh_release/firmware.bin dist/CrossPoint-XteinkX4.bin
-          cp .pio/build/m5stack-paper-s3/firmware.bin dist/CrossPoint-M5PaperS3.bin
+          X4_SRC=".pio/build/gh_release/firmware.bin"
+          if [ ! -f "${X4_SRC}" ]; then
+            # Fallback: locate any firmware.bin under .pio/build (excluding the Paper S3 output)
+            X4_SRC=$(find .pio/build -maxdepth 2 -type f -name firmware.bin ! -path "*/m5stack-paper-s3/*" | head -n 1)
+          fi
+          if [ -n "${X4_SRC}" ] && [ -f "${X4_SRC}" ]; then
+            echo "Using X4 firmware: ${X4_SRC}"
+            cp "${X4_SRC}" dist/CrossPoint-XteinkX4.bin
+          else
+            echo "ERROR: Could not locate X4 firmware.bin"
+            echo "Contents of .pio/build:" && ls -la .pio/build || true
+            find .pio/build -maxdepth 2 -type f -name firmware.bin -print || true
+            exit 1
+          fi
+
+          if [ -f .pio/build/m5stack-paper-s3/firmware.bin ]; then
+            cp .pio/build/m5stack-paper-s3/firmware.bin dist/CrossPoint-M5PaperS3.bin
+          else
+            echo "ERROR: Missing .pio/build/m5stack-paper-s3/firmware.bin"
+            echo "Contents of .pio/build/m5stack-paper-s3:" && ls -la .pio/build/m5stack-paper-s3 || true
+            exit 1
+          fi
 
       - name: Upload Artifacts (Xteink X4)
         uses: actions/upload-artifact@v4
