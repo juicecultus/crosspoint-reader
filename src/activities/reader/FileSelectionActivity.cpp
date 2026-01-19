@@ -108,8 +108,11 @@ void FileSelectionActivity::taskTrampoline(void* param) {
 void FileSelectionActivity::loadFiles() {
   files.clear();
 
+  Serial.printf("[%lu] [FSA] Loading files from: %s\n", millis(), basepath.c_str());
+
   auto root = SdMan.open(basepath.c_str());
   if (!root || !root.isDirectory()) {
+    Serial.printf("[%lu] [FSA] Failed to open directory or not a directory\n", millis());
     if (root) root.close();
     return;
   }
@@ -137,6 +140,7 @@ void FileSelectionActivity::loadFiles() {
   }
   root.close();
   sortFileList(files);
+  Serial.printf("[%lu] [FSA] Found %zu files\n", millis(), files.size());
 }
 
 void FileSelectionActivity::onEnter() {
