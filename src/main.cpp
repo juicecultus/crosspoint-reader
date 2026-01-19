@@ -21,6 +21,7 @@
 #include "Battery.h"
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
+#include "KOReaderCredentialStore.h"
 #include "MappedInputManager.h"
 #include "activities/boot_sleep/BootActivity.h"
 #include "activities/boot_sleep/SleepActivity.h"
@@ -333,6 +334,7 @@ void setup() {
   }
 
   SETTINGS.loadFromFile();
+  KOREADER_STORE.loadFromFile();
 
   // verify power button press duration after we've read settings.
   verifyWakeupLongPress();
