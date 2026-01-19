@@ -61,7 +61,7 @@ bool HomeActivity::onTouch(const TouchEvent& event) {
 
   // Book card bounds (must match render())
   const int bookWidth = w / 2;
-  const int bookHeight = h / 2;
+  const int bookHeight = h * 2 / 3;  // Increased by 1/3
   const int bookX = (w - bookWidth) / 2;
   constexpr int bookY = 30;
 
@@ -70,8 +70,8 @@ bool HomeActivity::onTouch(const TouchEvent& event) {
     if (hasContinueReading) {
       selectorIndex = 0;
       pendingActivate = true;
+      updateRequired = true;
     }
-    updateRequired = true;
     return true;
   }
 
@@ -79,7 +79,7 @@ bool HomeActivity::onTouch(const TouchEvent& event) {
   constexpr int margin = 20;
   constexpr int bottomMargin = 60;
   const int menuTileWidth = w - 2 * margin;
-  constexpr int menuTileHeight = 45;
+  constexpr int menuTileHeight = 68;  // Increased by 50% from 45
   constexpr int menuSpacing = 8;
 
   const bool hasMenuContinueSlot = hasContinueReading;
@@ -379,7 +379,7 @@ void HomeActivity::render() {
 
   // --- Top "book" card for the current title (selectorIndex == 0) ---
   const int bookWidth = pageWidth / 2;
-  const int bookHeight = pageHeight / 2;
+  const int bookHeight = pageHeight * 2 / 3;  // Increased by 1/3
   const int bookX = (pageWidth - bookWidth) / 2;
   constexpr int bookY = 30;
   const bool bookSelected = hasContinueReading && selectorIndex == 0;
@@ -665,7 +665,7 @@ void HomeActivity::render() {
   }
 
   const int menuTileWidth = pageWidth - 2 * margin;
-  constexpr int menuTileHeight = 45;
+  constexpr int menuTileHeight = 68;  // Increased by 50% from 45
   constexpr int menuSpacing = 8;
   const int totalMenuHeight =
       static_cast<int>(menuItems.size()) * menuTileHeight + (static_cast<int>(menuItems.size()) - 1) * menuSpacing;
