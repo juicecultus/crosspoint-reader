@@ -18,6 +18,8 @@
 
 namespace {
 constexpr int MENU_ITEMS = 2;
+constexpr int LINE_HEIGHT = 60;
+constexpr int START_Y = 60;
 const char* menuNames[MENU_ITEMS] = {"Calibre Web URL", "Connect as Wireless Device"};
 }  // namespace
 
@@ -56,11 +58,9 @@ bool CalibreSettingsActivity::onTouch(const TouchEvent& event) {
     return true;
   }
 
-  // Menu rows: start at y=120, lineHeight=40 (must match render())
-  constexpr int startY = 120;
-  constexpr int lineHeight = 40;
-  if (y >= startY) {
-    const int idx = (y - startY) / lineHeight;
+  // Menu rows
+  if (y >= START_Y) {
+    const int idx = (y - START_Y) / LINE_HEIGHT;
     if (idx >= 0 && idx < MENU_ITEMS) {
       selectedIndex = idx;
       handleSelection();
@@ -200,11 +200,12 @@ void CalibreSettingsActivity::render() {
   renderer.drawCenteredText(UI_12_FONT_ID, 15, "Calibre", true, EpdFontFamily::BOLD);
 
   // Draw selection highlight
-  renderer.fillRect(0, 60 + selectedIndex * 30 - 2, pageWidth - 1, 30);
+  const int textYOffset = (LINE_HEIGHT - renderer.getLineHeight(UI_10_FONT_ID)) / 2;
+  renderer.fillRect(0, START_Y + selectedIndex * LINE_HEIGHT - 2, pageWidth - 1, LINE_HEIGHT);
 
   // Draw menu items
   for (int i = 0; i < MENU_ITEMS; i++) {
-    const int settingY = 60 + i * 30;
+    const int settingY = START_Y + i * LINE_HEIGHT + textYOffset;
     const bool isSelected = (i == selectedIndex);
 
     renderer.drawText(UI_10_FONT_ID, 20, settingY, menuNames[i], !isSelected);

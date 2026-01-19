@@ -18,9 +18,19 @@
 #endif
 
 namespace {
-constexpr int PAGE_ITEMS = 23;
+constexpr int START_Y = 60;
+constexpr int LINE_HEIGHT = 60;
 constexpr int SKIP_PAGE_MS = 700;
 constexpr char OPDS_ROOT_PATH[] = "opds";  // No leading slash - relative to server URL
+
+int getPageItems(const GfxRenderer& renderer) {
+  const int screenHeight = renderer.getScreenHeight();
+  const int endY = screenHeight - 60;  // Leave space for button hints
+  const int availableHeight = endY - START_Y;
+  int items = availableHeight / LINE_HEIGHT;
+  if (items < 1) items = 1;
+  return items;
+}
 }  // namespace
 
 void OpdsBookBrowserActivity::taskTrampoline(void* param) {
@@ -168,15 +178,17 @@ void OpdsBookBrowserActivity::loop() {
     } else if (mappedInput.wasReleased(MappedInputManager::Button::Back)) {
       navigateBack();
     } else if (prevReleased && !entries.empty()) {
+      const int pageItems = getPageItems(renderer);
       if (skipPage) {
-        selectorIndex = ((selectorIndex / PAGE_ITEMS - 1) * PAGE_ITEMS + entries.size()) % entries.size();
+        selectorIndex = ((selectorIndex / pageItems - 1) * pageItems + entries.size()) % entries.size();
       } else {
         selectorIndex = (selectorIndex + entries.size() - 1) % entries.size();
       }
       updateRequired = true;
     } else if (nextReleased && !entries.empty()) {
+      const int pageItems = getPageItems(renderer);
       if (skipPage) {
-        selectorIndex = ((selectorIndex / PAGE_ITEMS + 1) * PAGE_ITEMS) % entries.size();
+        selectorIndex = ((selectorIndex / pageItems + 1) * pageItems) % entries.size();
       } else {
         selectorIndex = (selectorIndex + 1) % entries.size();
       }
@@ -216,8 +228,9 @@ bool OpdsBookBrowserActivity::onTouch(const TouchEvent& event) {
     if (entries.empty()) {
       return true;
     }
+    const int pageItems = getPageItems(renderer);
     const int total = static_cast<int>(entries.size());
-    const int step = std::min(PAGE_ITEMS, total);
+    const int step = std::min(pageItems, total);
     selectorIndex = (selectorIndex + total - step) % total;
     updateRequired = true;
     return true;
@@ -227,8 +240,9 @@ bool OpdsBookBrowserActivity::onTouch(const TouchEvent& event) {
     if (entries.empty()) {
       return true;
     }
+    const int pageItems = getPageItems(renderer);
     const int total = static_cast<int>(entries.size());
-    const int step = std::min(PAGE_ITEMS, total);
+    const int step = std::min(pageItems, total);
     selectorIndex = (selectorIndex + step) % total;
     updateRequired = true;
     return true;
@@ -238,20 +252,18 @@ bool OpdsBookBrowserActivity::onTouch(const TouchEvent& event) {
     return false;
   }
 
-  // Rows: startY=60, lineHeight=30, paged by PAGE_ITEMS
-  constexpr int startY = 60;
-  constexpr int lineHeight = 30;
+  const int pageItems = getPageItems(renderer);
   const int y = event.end.y;
-  if (y < startY || entries.empty()) {
+  if (y < START_Y || entries.empty()) {
     return false;
   }
 
-  const int row = (y - startY) / lineHeight;
-  if (row < 0 || row >= PAGE_ITEMS) {
+  const int row = (y - START_Y) / LINE_HEIGHT;
+  if (row < 0 || row >= pageItems) {
     return false;
   }
 
-  const int pageStartIndex = selectorIndex / PAGE_ITEMS * PAGE_ITEMS;
+  const int pageStartIndex = selectorIndex / pageItems * pageItems;
   const int tappedIndex = pageStartIndex + row;
   if (tappedIndex >= 0 && tappedIndex < static_cast<int>(entries.size())) {
     selectorIndex = tappedIndex;
@@ -338,10 +350,13 @@ void OpdsBookBrowserActivity::render() const {
     return;
   }
 
-  const auto pageStartIndex = selectorIndex / PAGE_ITEMS * PAGE_ITEMS;
-  renderer.fillRect(0, 60 + (selectorIndex % PAGE_ITEMS) * 30 - 2, pageWidth - 1, 30);
+  const int pageItems = getPageItems(renderer);
+  const auto pageStartIndex = selectorIndex / pageItems * pageItems;
+  const int textYOffset = (LINE_HEIGHT - renderer.getLineHeight(UI_10_FONT_ID)) / 2;
 
-  for (size_t i = pageStartIndex; i < entries.size() && i < static_cast<size_t>(pageStartIndex + PAGE_ITEMS); i++) {
+  renderer.fillRect(0, START_Y + (selectorIndex % pageItems) * LINE_HEIGHT - 2, pageWidth - 1, LINE_HEIGHT);
+
+  for (size_t i = pageStartIndex; i < entries.size() && i < static_cast<size_t>(pageStartIndex + pageItems); i++) {
     const auto& entry = entries[i];
 
     // Format display text with type indicator
@@ -357,7 +372,7 @@ void OpdsBookBrowserActivity::render() const {
     }
 
     auto item = renderer.truncatedText(UI_10_FONT_ID, displayText.c_str(), renderer.getScreenWidth() - 40);
-    renderer.drawText(UI_10_FONT_ID, 20, 60 + (i % PAGE_ITEMS) * 30, item.c_str(),
+    renderer.drawText(UI_10_FONT_ID, 20, START_Y + (i % pageItems) * LINE_HEIGHT + textYOffset, item.c_str(),
                       i != static_cast<size_t>(selectorIndex));
   }
 

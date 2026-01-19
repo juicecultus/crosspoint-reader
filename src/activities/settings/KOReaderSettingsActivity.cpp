@@ -16,8 +16,8 @@
 
 namespace {
 constexpr int MENU_ITEMS = 5;
-constexpr int ROW_HEIGHT = 30;
-constexpr int FIRST_ROW_Y = 60;
+constexpr int LINE_HEIGHT = 60;
+constexpr int START_Y = 60;
 const char* menuNames[MENU_ITEMS] = {"Username", "Password", "Sync Server URL", "Document Matching", "Authenticate"};
 }  // namespace
 
@@ -49,8 +49,8 @@ bool KOReaderSettingsActivity::onTouch(const TouchEvent& event) {
   }
 
   const int y = event.end.y;
-  if (y >= FIRST_ROW_Y && y < FIRST_ROW_Y + MENU_ITEMS * ROW_HEIGHT) {
-    const int tappedIndex = (y - FIRST_ROW_Y) / ROW_HEIGHT;
+  if (y >= START_Y && y < START_Y + MENU_ITEMS * LINE_HEIGHT) {
+    const int tappedIndex = (y - START_Y) / LINE_HEIGHT;
     if (tappedIndex == selectedIndex) {
       handleSelection();
     } else {
@@ -227,11 +227,12 @@ void KOReaderSettingsActivity::render() {
   renderer.drawCenteredText(UI_12_FONT_ID, 15, "KOReader Sync", true, EpdFontFamily::BOLD);
 
   // Draw selection highlight
-  renderer.fillRect(0, 60 + selectedIndex * 30 - 2, pageWidth - 1, 30);
+  const int textYOffset = (LINE_HEIGHT - renderer.getLineHeight(UI_10_FONT_ID)) / 2;
+  renderer.fillRect(0, START_Y + selectedIndex * LINE_HEIGHT - 2, pageWidth - 1, LINE_HEIGHT);
 
   // Draw menu items
   for (int i = 0; i < MENU_ITEMS; i++) {
-    const int settingY = 60 + i * 30;
+    const int settingY = START_Y + i * LINE_HEIGHT + textYOffset;
     const bool isSelected = (i == selectedIndex);
 
     renderer.drawText(UI_10_FONT_ID, 20, settingY, menuNames[i], !isSelected);

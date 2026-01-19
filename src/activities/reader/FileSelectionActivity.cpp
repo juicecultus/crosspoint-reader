@@ -12,7 +12,8 @@
 #endif
 
 namespace {
-constexpr int PAGE_ITEMS = 23;
+constexpr int START_Y = 60;
+constexpr int LINE_HEIGHT = 60;
 constexpr int SKIP_PAGE_MS = 700;
 constexpr unsigned long GO_HOME_MS = 1000;
 }  // namespace
@@ -33,7 +34,8 @@ bool FileSelectionActivity::onTouch(const TouchEvent& event) {
     if (files.empty()) {
       return true;
     }
-    const size_t step = std::min(static_cast<size_t>(PAGE_ITEMS), files.size());
+    const size_t pageItems = static_cast<size_t>(getPageItems());
+    const size_t step = std::min(pageItems, files.size());
     selectorIndex = (selectorIndex + files.size() - step) % files.size();
     updateRequired = true;
     return true;
@@ -43,7 +45,8 @@ bool FileSelectionActivity::onTouch(const TouchEvent& event) {
     if (files.empty()) {
       return true;
     }
-    const size_t step = std::min(static_cast<size_t>(PAGE_ITEMS), files.size());
+    const size_t pageItems = static_cast<size_t>(getPageItems());
+    const size_t step = std::min(pageItems, files.size());
     selectorIndex = (selectorIndex + step) % files.size();
     updateRequired = true;
     return true;
@@ -79,13 +82,12 @@ bool FileSelectionActivity::onTouch(const TouchEvent& event) {
     return true;
   }
 
-  // Rows: start at y=60, lineHeight=30, paged by PAGE_ITEMS (must match render())
-  constexpr int startY = 60;
-  constexpr int lineHeight = 30;
-  if (y >= startY && !files.empty()) {
-    const int row = (y - startY) / lineHeight;
-    if (row >= 0 && row < PAGE_ITEMS) {
-      const size_t pageStartIndex = (selectorIndex / PAGE_ITEMS) * PAGE_ITEMS;
+  // Rows: start at START_Y, LINE_HEIGHT pixels each
+  if (y >= START_Y && !files.empty()) {
+    const int pageItems = getPageItems();
+    const int row = (y - START_Y) / LINE_HEIGHT;
+    if (row >= 0 && row < pageItems) {
+      const size_t pageStartIndex = (selectorIndex / pageItems) * pageItems;
       const size_t tappedIndex = pageStartIndex + static_cast<size_t>(row);
       if (tappedIndex < files.size()) {
         selectorIndex = tappedIndex;
@@ -103,6 +105,17 @@ bool FileSelectionActivity::onTouch(const TouchEvent& event) {
 void FileSelectionActivity::taskTrampoline(void* param) {
   auto* self = static_cast<FileSelectionActivity*>(param);
   self->displayTaskLoop();
+}
+
+int FileSelectionActivity::getPageItems() const {
+  const int screenHeight = renderer.getScreenHeight();
+  const int endY = screenHeight - 60;  // Leave space for button hints at bottom
+  const int availableHeight = endY - START_Y;
+  int items = availableHeight / LINE_HEIGHT;
+  if (items < 1) {
+    items = 1;
+  }
+  return items;
 }
 
 void FileSelectionActivity::loadFiles() {
@@ -262,15 +275,17 @@ void FileSelectionActivity::loop() {
       }
     }
   } else if (prevReleased) {
+    const int pageItems = getPageItems();
     if (skipPage) {
-      selectorIndex = ((selectorIndex / PAGE_ITEMS - 1) * PAGE_ITEMS + files.size()) % files.size();
+      selectorIndex = ((selectorIndex / pageItems - 1) * pageItems + files.size()) % files.size();
     } else {
       selectorIndex = (selectorIndex + files.size() - 1) % files.size();
     }
     updateRequired = true;
   } else if (nextReleased) {
+    const int pageItems = getPageItems();
     if (skipPage) {
-      selectorIndex = ((selectorIndex / PAGE_ITEMS + 1) * PAGE_ITEMS) % files.size();
+      selectorIndex = ((selectorIndex / pageItems + 1) * pageItems) % files.size();
     } else {
       selectorIndex = (selectorIndex + 1) % files.size();
     }
@@ -301,16 +316,19 @@ void FileSelectionActivity::render() const {
   renderer.drawButtonHints(UI_10_FONT_ID, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
 
   if (files.empty()) {
-    renderer.drawText(UI_10_FONT_ID, 20, 60, "No books found");
+    renderer.drawText(UI_10_FONT_ID, 20, START_Y, "No books found");
     renderer.displayBuffer();
     return;
   }
 
-  const auto pageStartIndex = selectorIndex / PAGE_ITEMS * PAGE_ITEMS;
-  renderer.fillRect(0, 60 + (selectorIndex % PAGE_ITEMS) * 30 - 2, pageWidth - 1, 30);
-  for (size_t i = pageStartIndex; i < files.size() && i < pageStartIndex + PAGE_ITEMS; i++) {
+  const int pageItems = getPageItems();
+  const auto pageStartIndex = selectorIndex / pageItems * pageItems;
+  const int textYOffset = (LINE_HEIGHT - renderer.getLineHeight(UI_10_FONT_ID)) / 2;
+
+  renderer.fillRect(0, START_Y + (selectorIndex % pageItems) * LINE_HEIGHT - 2, pageWidth - 1, LINE_HEIGHT);
+  for (size_t i = pageStartIndex; i < files.size() && i < pageStartIndex + static_cast<size_t>(pageItems); i++) {
     auto item = renderer.truncatedText(UI_10_FONT_ID, files[i].c_str(), renderer.getScreenWidth() - 40);
-    renderer.drawText(UI_10_FONT_ID, 20, 60 + (i % PAGE_ITEMS) * 30, item.c_str(), i != selectorIndex);
+    renderer.drawText(UI_10_FONT_ID, 20, START_Y + (i % pageItems) * LINE_HEIGHT + textYOffset, item.c_str(), i != selectorIndex);
   }
 
   renderer.displayBuffer();
