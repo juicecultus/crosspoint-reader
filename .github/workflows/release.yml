@@ -52,28 +52,36 @@ jobs:
       - name: Prepare artifacts
         run: |
           mkdir -p dist
+          echo "=== Searching for firmware files ==="
+          find .pio/build -name "firmware.bin" -type f
+          
           X4_SRC=".pio/build/gh_release/firmware.bin"
           if [ ! -f "${X4_SRC}" ]; then
+            echo "Primary path not found, trying fallback..."
             # Fallback: locate any firmware.bin under .pio/build (excluding the Paper S3 output)
-            X4_SRC=$(find .pio/build -maxdepth 2 -type f -name firmware.bin ! -path "*/m5stack-paper-s3/*" | head -n 1)
+            X4_SRC=$(find .pio/build -maxdepth 3 -type f -name firmware.bin ! -path "*/m5stack-paper-s3/*" | head -n 1)
           fi
           if [ -n "${X4_SRC}" ] && [ -f "${X4_SRC}" ]; then
             echo "Using X4 firmware: ${X4_SRC}"
             cp "${X4_SRC}" dist/CrossPoint-XteinkX4.bin
           else
             echo "ERROR: Could not locate X4 firmware.bin"
-            echo "Contents of .pio/build:" && ls -la .pio/build || true
-            find .pio/build -maxdepth 2 -type f -name firmware.bin -print || true
+            echo "Contents of .pio/build:" && ls -laR .pio/build || true
             exit 1
           fi
 
-          if [ -f .pio/build/m5stack-paper-s3/firmware.bin ]; then
-            cp .pio/build/m5stack-paper-s3/firmware.bin dist/CrossPoint-M5PaperS3.bin
+          M5_SRC=".pio/build/m5stack-paper-s3/firmware.bin"
+          if [ -f "${M5_SRC}" ]; then
+            echo "Using M5 Paper S3 firmware: ${M5_SRC}"
+            cp "${M5_SRC}" dist/CrossPoint-M5PaperS3.bin
           else
-            echo "ERROR: Missing .pio/build/m5stack-paper-s3/firmware.bin"
+            echo "ERROR: Missing ${M5_SRC}"
             echo "Contents of .pio/build/m5stack-paper-s3:" && ls -la .pio/build/m5stack-paper-s3 || true
             exit 1
           fi
+          
+          echo "=== Artifacts prepared ==="
+          ls -la dist/
 
       - name: Upload Artifacts (Xteink X4)
         uses: actions/upload-artifact@v4
