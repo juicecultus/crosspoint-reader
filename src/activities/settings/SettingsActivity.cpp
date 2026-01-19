@@ -18,13 +18,7 @@
 
 // Define the static settings list
 namespace {
-#ifdef USE_M5UNIFIED
-constexpr int settingsCount = 16;
-#else
-constexpr int settingsCount = 20;
-#endif
-
-const SettingInfo settingsList[settingsCount] = {
+const SettingInfo settingsList[] = {
     // Should match with SLEEP_SCREEN_MODE
     SettingInfo::Enum("Sleep Screen", &CrossPointSettings::sleepScreen, {"Dark", "Light", "Custom", "Cover", "None"}),
     SettingInfo::Enum("Sleep Screen Cover Mode", &CrossPointSettings::sleepScreenCoverMode, {"Fit", "Crop"}),
@@ -58,6 +52,8 @@ const SettingInfo settingsList[settingsCount] = {
     SettingInfo::Action("KOReader Sync"),
     SettingInfo::Action("Calibre Settings"),
     SettingInfo::Action("Check for updates")};
+
+constexpr int settingsCount = static_cast<int>(sizeof(settingsList) / sizeof(settingsList[0]));
 
 int getSettingsPageItems(const GfxRenderer& renderer) {
   constexpr int startY = 60;

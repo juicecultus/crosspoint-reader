@@ -204,7 +204,11 @@ void verifyWakeupLongPress() {
   if (abort) {
     // Button released too early. Returning to sleep.
     // IMPORTANT: Re-arm the wakeup trigger before sleeping again
+ #if defined(CONFIG_IDF_TARGET_ESP32C3)
+    esp_sleep_enable_ext1_wakeup(1ULL << InputManager::POWER_BUTTON_PIN, ESP_EXT1_WAKEUP_ALL_LOW);
+ #else
     esp_sleep_enable_ext0_wakeup(static_cast<gpio_num_t>(InputManager::POWER_BUTTON_PIN), 0);
+ #endif
     esp_deep_sleep_start();
   }
 }
@@ -230,7 +234,11 @@ void enterDeepSleep() {
   delay(1000);
   esp_deep_sleep_start();
 #else
+ #if defined(CONFIG_IDF_TARGET_ESP32C3)
+  esp_sleep_enable_ext1_wakeup(1ULL << InputManager::POWER_BUTTON_PIN, ESP_EXT1_WAKEUP_ALL_LOW);
+ #else
   esp_sleep_enable_ext0_wakeup(static_cast<gpio_num_t>(InputManager::POWER_BUTTON_PIN), 0);
+ #endif
   // Ensure that the power button has been released to avoid immediately turning back on if you're holding it
   waitForPowerRelease();
   // Enter Deep Sleep
@@ -265,7 +273,6 @@ void onGoHome() {
 #ifdef USE_M5UNIFIED
   touchManager.ignoreFor(450);
 #endif
-  inputManager.ignoreFor(450);
   exitActivity();
   enterNewActivity(new HomeActivity(renderer, mappedInputManager, onContinueReading, onGoToReaderHome, onGoToSettings,
                                     onGoToFileTransfer, onGoToBrowser));
