@@ -71,14 +71,15 @@ void HalTiltSensor::begin() {
   LOG_INF("TILT", "QMI8658 IMU found at 0x%02X", _i2cAddr);
 
   // CTRL1: enable address auto-increment (bit 6)
-  writeReg(REG_CTRL1, 0x40);
-
-  // CTRL2: accelerometer config — ±2g full scale (000), ODR 31.25 Hz (1000)
-  //   [6:4]=000 (±2g), [3:0]=1000 (31.25 Hz)
-  writeReg(REG_CTRL2, 0x08);
-
-  // CTRL7: enable accelerometer only (bit 0), gyro disabled (bit 1 = 0)
-  writeReg(REG_CTRL7, 0x01);
+  if (!writeReg(REG_CTRL1, 0x40) ||
+      // CTRL2: accelerometer config — ±2g full scale (000), ODR 31.25 Hz (1000)
+      !writeReg(REG_CTRL2, 0x08) ||
+      // CTRL7: enable accelerometer only (bit 0), gyro disabled (bit 1 = 0)
+      !writeReg(REG_CTRL7, 0x01)) {
+    LOG_INF("TILT", "QMI8658 register configuration failed");
+    _available = false;
+    return;
+  }
 
   _available = true;
   _lastPollMs = millis();
@@ -167,5 +168,5 @@ void HalTiltSensor::clearPendingEvents() {
   _tiltForwardEvent = false;
   _tiltBackEvent = false;
   _hadActivity = false;
-  _inTilt = false;
+  // Intentionally preserve _inTilt so a held tilt doesn't retrigger on next poll
 }
