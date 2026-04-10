@@ -5,6 +5,11 @@
 
 #include "HalGPIO.h"
 
+// Forward-declare orientation enum to avoid circular include
+namespace CrossPointOrientation {
+enum Value : uint8_t { PORTRAIT = 0, LANDSCAPE_CW = 1, INVERTED = 2, LANDSCAPE_CCW = 3 };
+}
+
 class HalTiltSensor;
 extern HalTiltSensor halTiltSensor;  // Singleton
 
@@ -15,6 +20,7 @@ class HalTiltSensor {
   // Tilt gesture state machine
   bool _tiltForwardEvent = false;  // Consumed by wasTiltedForward()
   bool _tiltBackEvent = false;     // Consumed by wasTiltedBack()
+  bool _hadActivity = false;       // Non-consuming flag for sleep timer
   bool _inTilt = false;            // Currently tilted past threshold
   unsigned long _lastTiltMs = 0;   // Debounce / cooldown
 
@@ -45,8 +51,8 @@ class HalTiltSensor {
   bool isAvailable() const { return _available; }
 
   // Poll the accelerometer and update tilt gesture state.
-  // Should be called regularly in the main loop (internally rate-limited).
-  void update();
+  // Only polls when enabled. Pass current reader orientation for correct axis mapping.
+  void update(uint8_t orientation = CrossPointOrientation::PORTRAIT);
 
   // Returns true once per tilt-forward gesture (next page direction).
   // Consumed on read — subsequent calls return false until next gesture.
@@ -55,4 +61,11 @@ class HalTiltSensor {
   // Returns true once per tilt-back gesture (previous page direction).
   // Consumed on read.
   bool wasTiltedBack();
+
+  // Non-consuming: true if any tilt activity occurred since last call.
+  // Used to reset the auto-sleep inactivity timer.
+  bool hadActivity();
+
+  // Discard any pending tilt events (call when leaving reader or disabling tilt).
+  void clearPendingEvents();
 };
