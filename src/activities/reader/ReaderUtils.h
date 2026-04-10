@@ -2,6 +2,7 @@
 
 #include <CrossPointSettings.h>
 #include <GfxRenderer.h>
+#include <HalTiltSensor.h>
 #include <Logging.h>
 
 #include "MappedInputManager.h"
@@ -36,16 +37,18 @@ struct PageTurnResult {
 
 inline PageTurnResult detectPageTurn(const MappedInputManager& input) {
   const bool usePress = !SETTINGS.longPressChapterSkip;
-  const bool prev = usePress ? (input.wasPressed(MappedInputManager::Button::PageBack) ||
-                                input.wasPressed(MappedInputManager::Button::Left))
-                             : (input.wasReleased(MappedInputManager::Button::PageBack) ||
-                                input.wasReleased(MappedInputManager::Button::Left));
+  const bool tiltNext = SETTINGS.tiltPageTurn && halTiltSensor.wasTiltedForward();
+  const bool tiltPrev = SETTINGS.tiltPageTurn && halTiltSensor.wasTiltedBack();
+  const bool prev = tiltPrev || (usePress ? (input.wasPressed(MappedInputManager::Button::PageBack) ||
+                                             input.wasPressed(MappedInputManager::Button::Left))
+                                          : (input.wasReleased(MappedInputManager::Button::PageBack) ||
+                                             input.wasReleased(MappedInputManager::Button::Left)));
   const bool powerTurn = SETTINGS.shortPwrBtn == CrossPointSettings::SHORT_PWRBTN::PAGE_TURN &&
                          input.wasReleased(MappedInputManager::Button::Power);
-  const bool next = usePress ? (input.wasPressed(MappedInputManager::Button::PageForward) || powerTurn ||
-                                input.wasPressed(MappedInputManager::Button::Right))
-                             : (input.wasReleased(MappedInputManager::Button::PageForward) || powerTurn ||
-                                input.wasReleased(MappedInputManager::Button::Right));
+  const bool next = tiltNext || (usePress ? (input.wasPressed(MappedInputManager::Button::PageForward) || powerTurn ||
+                                             input.wasPressed(MappedInputManager::Button::Right))
+                                          : (input.wasReleased(MappedInputManager::Button::PageForward) || powerTurn ||
+                                             input.wasReleased(MappedInputManager::Button::Right)));
   return {prev, next};
 }
 
