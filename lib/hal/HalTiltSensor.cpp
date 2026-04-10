@@ -85,7 +85,7 @@ void HalTiltSensor::begin() {
   LOG_INF("TILT", "QMI8658 accelerometer initialized (±2g, 31.25 Hz)");
 }
 
-void HalTiltSensor::update() {
+void HalTiltSensor::update(uint8_t orientation) {
   if (!_available) {
     return;
   }
@@ -101,10 +101,26 @@ void HalTiltSensor::update() {
     return;
   }
 
-  // On the X3 PCB the accelerometer Y axis is aligned with left/right tilt
-  // when the device is held upright in portrait mode.
-  // Positive Y = tilted right, negative Y = tilted left.
-  const float tiltAxis = ay;
+  // Map the accelerometer axis to left/right tilt based on reader orientation.
+  // On the X3 PCB: Y axis = left/right in portrait, X axis = left/right in landscape.
+  float tiltAxis;
+  switch (orientation) {
+    case CrossPointOrientation::PORTRAIT:
+      tiltAxis = ay;
+      break;
+    case CrossPointOrientation::INVERTED:
+      tiltAxis = -ay;
+      break;
+    case CrossPointOrientation::LANDSCAPE_CW:
+      tiltAxis = ax;
+      break;
+    case CrossPointOrientation::LANDSCAPE_CCW:
+      tiltAxis = -ax;
+      break;
+    default:
+      tiltAxis = ay;
+      break;
+  }
 
   if (_inTilt) {
     // Wait for device to return to neutral before allowing next trigger
@@ -116,10 +132,12 @@ void HalTiltSensor::update() {
     if ((now - _lastTiltMs) >= COOLDOWN_MS) {
       if (tiltAxis > TILT_THRESHOLD_G) {
         _tiltForwardEvent = true;
+        _hadActivity = true;
         _inTilt = true;
         _lastTiltMs = now;
       } else if (tiltAxis < -TILT_THRESHOLD_G) {
         _tiltBackEvent = true;
+        _hadActivity = true;
         _inTilt = true;
         _lastTiltMs = now;
       }
@@ -137,4 +155,17 @@ bool HalTiltSensor::wasTiltedBack() {
   const bool val = _tiltBackEvent;
   _tiltBackEvent = false;
   return val;
+}
+
+bool HalTiltSensor::hadActivity() {
+  const bool val = _hadActivity;
+  _hadActivity = false;
+  return val;
+}
+
+void HalTiltSensor::clearPendingEvents() {
+  _tiltForwardEvent = false;
+  _tiltBackEvent = false;
+  _hadActivity = false;
+  _inTilt = false;
 }
