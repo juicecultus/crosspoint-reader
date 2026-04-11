@@ -33,6 +33,7 @@ inline void applyOrientation(GfxRenderer& renderer, const uint8_t orientation) {
 struct PageTurnResult {
   bool prev;
   bool next;
+  bool fromTilt;
 };
 
 inline PageTurnResult detectPageTurn(const MappedInputManager& input) {
@@ -49,7 +50,7 @@ inline PageTurnResult detectPageTurn(const MappedInputManager& input) {
                                              input.wasPressed(MappedInputManager::Button::Right))
                                           : (input.wasReleased(MappedInputManager::Button::PageForward) || powerTurn ||
                                              input.wasReleased(MappedInputManager::Button::Right)));
-  return {prev, next};
+  return {prev, next, tiltPrev || tiltNext};
 }
 
 inline void displayWithRefreshCycle(const GfxRenderer& renderer, int& pagesUntilFullRefresh) {
