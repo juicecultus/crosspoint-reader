@@ -24,12 +24,23 @@ class HalTiltSensor {
   bool _inTilt = false;            // Currently tilted past threshold
   bool _isAwake = false;           // Tracks power state
   unsigned long _lastTiltMs = 0;   // Debounce / cooldown
+  unsigned long _wakeMs = 0;       // Timestamp of last wake() for stabilization
+  float _biasX = 0.0f;             // Gyro zero-rate offset (calibrated after wake)
+  float _biasY = 0.0f;
+  float _biasZ = 0.0f;
+  uint8_t _calibSamples = 0;  // Number of calibration samples collected
+  float _calibAccX = 0.0f;    // Accumulator for calibration averaging
+  float _calibAccY = 0.0f;
+  float _calibAccZ = 0.0f;
+  bool _calibrated = false;  // True once zero-rate offset is established
 
   // Tuning constants
-  static constexpr float RATE_THRESHOLD_DPS = 270.0f;    // Deg/sec speed to trigger flick
-  static constexpr float NEUTRAL_RATE_DPS = 50.0f;       // Must stop moving below this rate before next trigger
-  static constexpr unsigned long COOLDOWN_MS = 600;      // Minimum ms between triggers
-  static constexpr unsigned long POLL_INTERVAL_MS = 50;  // 20 Hz polling
+  static constexpr float RATE_THRESHOLD_DPS = 270.0f;      // Deg/sec speed to trigger flick
+  static constexpr float NEUTRAL_RATE_DPS = 50.0f;         // Must stop moving below this rate before next trigger
+  static constexpr unsigned long COOLDOWN_MS = 600;        // Minimum ms between triggers
+  static constexpr unsigned long POLL_INTERVAL_MS = 50;    // 20 Hz polling
+  static constexpr unsigned long WAKE_STABILIZE_MS = 200;  // Ignore readings after wake
+  static constexpr uint8_t CALIB_SAMPLE_COUNT = 4;         // Samples to average for zero-rate offset
 
   mutable unsigned long _lastPollMs = 0;
 

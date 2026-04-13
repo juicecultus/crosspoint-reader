@@ -96,7 +96,11 @@ void HalTiltSensor::wake() {
   // REG_CTRL7 (0x08): Write 0x02 to re-enable the Gyroscope
   if (writeReg(REG_CTRL1, 0x40) && writeReg(REG_CTRL7, 0x02)) {
     _lastPollMs = millis();
-    _lastTiltMs = millis();  // Reset cooldown
+    _lastTiltMs = millis();
+    _wakeMs = millis();
+    _calibSamples = 0;
+    _calibAccX = _calibAccY = _calibAccZ = 0.0f;
+    _calibrated = false;
     LOG_INF("TILT", "QMI8658 woke up");
   } else {
     LOG_INF("TILT", "Failed to wake QMI8658");
@@ -119,6 +123,7 @@ void HalTiltSensor::deepSleep() {
   // Clear any residual state so it doesn't immediately trigger upon waking
   clearPendingEvents();
   _inTilt = false;
+  _calibrated = false;
 }
 
 void HalTiltSensor::update(bool enabled, uint8_t orientation) {
@@ -153,24 +158,50 @@ void HalTiltSensor::update(bool enabled, uint8_t orientation) {
     return;
   }
 
+  // Stabilization: discard readings during gyro startup transient
+  if ((now - _wakeMs) < WAKE_STABILIZE_MS) {
+    return;
+  }
+
+  // Zero-rate offset calibration: average the first few stable samples
+  if (!_calibrated) {
+    _calibAccX += gx;
+    _calibAccY += gy;
+    _calibAccZ += gz;
+    _calibSamples++;
+    if (_calibSamples >= CALIB_SAMPLE_COUNT) {
+      _biasX = _calibAccX / CALIB_SAMPLE_COUNT;
+      _biasY = _calibAccY / CALIB_SAMPLE_COUNT;
+      _biasZ = _calibAccZ / CALIB_SAMPLE_COUNT;
+      _calibrated = true;
+      LOG_INF("TILT", "Gyro calibrated: bias=(%.1f, %.1f, %.1f) dps", _biasX, _biasY, _biasZ);
+    }
+    return;
+  }
+
+  // Subtract zero-rate offset
+  gx -= _biasX;
+  gy -= _biasY;
+  gz -= _biasZ;
+
   // Map the gyro axis to left/right tilt based on reader orientation.
   // On the X3 PCB: X axis = left/right in portrait, Y axis = left/right in landscape.
   float tiltAxis;
   switch (orientation) {
     case CrossPointOrientation::PORTRAIT:
-      tiltAxis = gx;
-      break;
-    case CrossPointOrientation::INVERTED:
       tiltAxis = -gx;
       break;
-    case CrossPointOrientation::LANDSCAPE_CW:
-      tiltAxis = -gy;
+    case CrossPointOrientation::INVERTED:
+      tiltAxis = gx;
       break;
-    case CrossPointOrientation::LANDSCAPE_CCW:
+    case CrossPointOrientation::LANDSCAPE_CW:
       tiltAxis = gy;
       break;
+    case CrossPointOrientation::LANDSCAPE_CCW:
+      tiltAxis = -gy;
+      break;
     default:
-      tiltAxis = gx;
+      tiltAxis = -gx;
       break;
   }
 
