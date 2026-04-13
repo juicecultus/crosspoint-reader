@@ -25,12 +25,13 @@ bool HalTiltSensor::readReg(uint8_t reg, uint8_t* val) const {
   return true;
 }
 
-bool HalTiltSensor::readAccel(float& ax, float& ay, float& az) const {
+bool HalTiltSensor::readGyro(float& gx, float& gy, float& gz) const {
   Wire.beginTransmission(_i2cAddr);
-  Wire.write(REG_AX_L);
+  Wire.write(REG_GX_L);  // Start reading at Gyro X Low
   if (Wire.endTransmission(false) != 0) {
     return false;
   }
+
   Wire.requestFrom(_i2cAddr, (uint8_t)6);
   if (Wire.available() < 6) {
     return false;
@@ -42,11 +43,11 @@ bool HalTiltSensor::readAccel(float& ax, float& ay, float& az) const {
     return static_cast<int16_t>((hi << 8) | lo);
   };
 
-  // ±2g scale: 16384 LSB/g
-  constexpr float SCALE = 1.0f / 16384.0f;
-  ax = readInt16() * SCALE;
-  ay = readInt16() * SCALE;
-  az = readInt16() * SCALE;
+  // If Full Scale is ±512 dps, the scale factor is 32768 / 512 = 64 LSB/dps
+  constexpr float SCALE = 1.0f / 64.0f;
+  gx = readInt16() * SCALE;
+  gy = readInt16() * SCALE;
+  gz = readInt16() * SCALE;
   return true;
 }
 
@@ -59,9 +60,9 @@ void HalTiltSensor::begin() {
   // Try primary address, then alternate
   uint8_t whoami = 0;
   _i2cAddr = I2C_ADDR_QMI8658;
-  if (!readReg(REG_WHO_AM_I, &whoami) || whoami != QMI8658_WHO_AM_I_VALUE) {
+  if (!readReg(QMI8658_WHO_AM_I_REG, &whoami) || whoami != QMI8658_WHO_AM_I_VALUE) {
     _i2cAddr = I2C_ADDR_QMI8658_ALT;
-    if (!readReg(REG_WHO_AM_I, &whoami) || whoami != QMI8658_WHO_AM_I_VALUE) {
+    if (!readReg(QMI8658_WHO_AM_I_REG, &whoami) || whoami != QMI8658_WHO_AM_I_VALUE) {
       LOG_INF("TILT", "QMI8658 IMU not found");
       _available = false;
       return;
@@ -70,12 +71,12 @@ void HalTiltSensor::begin() {
 
   LOG_INF("TILT", "QMI8658 IMU found at 0x%02X", _i2cAddr);
 
-  // CTRL1: enable address auto-increment (bit 6)
-  if (!writeReg(REG_CTRL1, 0x40) ||
-      // CTRL2: accelerometer config — ±2g full scale (000), ODR 31.25 Hz (1000)
-      !writeReg(REG_CTRL2, 0x08) ||
-      // CTRL7: enable accelerometer only (bit 0), gyro disabled (bit 1 = 0)
-      !writeReg(REG_CTRL7, 0x01)) {
+  // CTRL1: enable address auto-increment (bit 6) AND set SensorDisable (bit 0)
+  if (!writeReg(REG_CTRL1, 0x41) ||
+      // CTRL3: gyro config — ±512dps full scale (101), ODR 28.025 Hz (1000)
+      !writeReg(REG_CTRL3, 0x58) ||
+      // CTRL7: Initialize in SLEEP mode (0x00)
+      !writeReg(REG_CTRL7, 0x00)) {
     LOG_INF("TILT", "QMI8658 register configuration failed");
     _available = false;
     return;
@@ -83,11 +84,61 @@ void HalTiltSensor::begin() {
 
   _available = true;
   _lastPollMs = millis();
-  LOG_INF("TILT", "QMI8658 accelerometer initialized (±2g, 31.25 Hz)");
+  LOG_INF("TILT", "QMI8658 gyro initialized and put to sleep");
 }
 
-void HalTiltSensor::update(uint8_t orientation) {
+void HalTiltSensor::wake() {
   if (!_available) {
+    return;
+  }
+
+  // REG_CTRL1 (0x02): Writing 0x40 clears SensorDisable (bit 0)
+  // REG_CTRL7 (0x08): Write 0x02 to re-enable the Gyroscope
+  if (writeReg(REG_CTRL1, 0x40) && writeReg(REG_CTRL7, 0x02)) {
+    _lastPollMs = millis();
+    _lastTiltMs = millis();  // Reset cooldown
+    LOG_INF("TILT", "QMI8658 woke up");
+  } else {
+    LOG_INF("TILT", "Failed to wake QMI8658");
+  }
+}
+
+void HalTiltSensor::deepSleep() {
+  if (!_available) {
+    return;
+  }
+
+  // REG_CTRL7 (0x08): Writing 0x00 disables both Accel and Gyro
+  // REG_CTRL1 (0x02): Writing 0x41 enables SensorDisable (bit 0)
+  if (writeReg(REG_CTRL7, 0x00) && writeReg(REG_CTRL1, 0x41)) {
+    LOG_INF("TILT", "QMI8658 entered sleep mode");
+  } else {
+    LOG_INF("TILT", "Failed to put QMI8658 to sleep");
+  }
+
+  // Clear any residual state so it doesn't immediately trigger upon waking
+  clearPendingEvents();
+  _inTilt = false;
+}
+
+void HalTiltSensor::update(bool enabled, uint8_t orientation) {
+  if (!_available) {
+    return;
+  }
+
+  // State machine: wake up or sleep based on the enabled flag
+  if (enabled && !_isAwake) {
+    wake();
+    _isAwake = true;
+    return;
+  } else if (!enabled && _isAwake) {
+    deepSleep();
+    _isAwake = false;
+    return;
+  }
+
+  // If disabled, skip the rest of the polling logic
+  if (!enabled) {
     return;
   }
 
@@ -97,46 +148,46 @@ void HalTiltSensor::update(uint8_t orientation) {
   }
   _lastPollMs = now;
 
-  float ax, ay, az;
-  if (!readAccel(ax, ay, az)) {
+  float gx, gy, gz;
+  if (!readGyro(gx, gy, gz)) {
     return;
   }
 
-  // Map the accelerometer axis to left/right tilt based on reader orientation.
-  // On the X3 PCB: Y axis = left/right in portrait, X axis = left/right in landscape.
+  // Map the gyro axis to left/right tilt based on reader orientation.
+  // On the X3 PCB: X axis = left/right in portrait, Y axis = left/right in landscape.
   float tiltAxis;
   switch (orientation) {
     case CrossPointOrientation::PORTRAIT:
-      tiltAxis = ay;
+      tiltAxis = gx;
       break;
     case CrossPointOrientation::INVERTED:
-      tiltAxis = -ay;
+      tiltAxis = -gx;
       break;
     case CrossPointOrientation::LANDSCAPE_CW:
-      tiltAxis = ax;
+      tiltAxis = -gy;
       break;
     case CrossPointOrientation::LANDSCAPE_CCW:
-      tiltAxis = -ax;
+      tiltAxis = gy;
       break;
     default:
-      tiltAxis = ay;
+      tiltAxis = gx;
       break;
   }
 
   if (_inTilt) {
     // Wait for device to return to neutral before allowing next trigger
-    if (fabsf(tiltAxis) < NEUTRAL_THRESHOLD_G) {
+    if (fabsf(tiltAxis) < NEUTRAL_RATE_DPS) {
       _inTilt = false;
     }
   } else {
     // Check for new tilt gesture (with cooldown)
     if ((now - _lastTiltMs) >= COOLDOWN_MS) {
-      if (tiltAxis > TILT_THRESHOLD_G) {
+      if (tiltAxis > RATE_THRESHOLD_DPS) {
         _tiltForwardEvent = true;
         _hadActivity = true;
         _inTilt = true;
         _lastTiltMs = now;
-      } else if (tiltAxis < -TILT_THRESHOLD_G) {
+      } else if (tiltAxis < -RATE_THRESHOLD_DPS) {
         _tiltBackEvent = true;
         _hadActivity = true;
         _inTilt = true;
